@@ -4,15 +4,16 @@ import Estatisticas from '../components/Estatisticas'
 import Sequencias from '../components/Sequencias'
 
 function Dashboard() {
-  const [ligaSelecionada, setLigaSelecionada] = useState('Premier League Virtual')
+  const [ligaSelecionada, setLigaSelecionada] = useState('Express Cup')
   const [resultados, setResultados] = useState([])
   const [carregando, setCarregando] = useState(true)
 
   const ligas = [
-    'Premier League Virtual',
-    'Serie A Virtual',
-    'La Liga Virtual',
-    'Bundesliga Virtual',
+    'Express Cup',
+    'Copa do Mundo',
+    'Euro Cup',
+    'Super Liga Sul-Americana',
+    'Premier League',
   ]
 
   useEffect(() => {
