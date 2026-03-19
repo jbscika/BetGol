@@ -89,3 +89,35 @@ function Sequencias({ resultados }: Props) {
         <div style={{
           background: '#0f1117',
           borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          borderLeft: `4px solid ${corTendencia}`,
+          color: corTendencia,
+          fontWeight: 'bold',
+        }}>
+          {tendencia}
+        </div>
+      )}
+
+      {sequencias.length === 0 ? (
+        <div style={{ color: '#888', fontSize: '14px' }}>
+          Nenhuma sequência de 2+ resultados iguais detectada
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {sequencias.map((seq, i) => (
+            <div
+              key={i}
+              style={{
+                background: '#0f1117',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                borderLeft: `4px solid ${seq.cor}`,
+              }}
+            >
+              <span style={{ fontSize: '20px' }}>{seq.emoji}</span>
+              <div>
+                <div style={{ fontWeight: 'bold', color: seq.cor }}>
