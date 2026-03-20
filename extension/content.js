@@ -1,4 +1,6 @@
-// Intercepta requisições XHR da Bet365
+console.log('BetGol Capturador ativo!');
+
+// Intercepta XHR
 const originalOpen = XMLHttpRequest.prototype.open;
 const originalSend = XMLHttpRequest.prototype.send;
 
@@ -10,56 +12,43 @@ XMLHttpRequest.prototype.open = function(method, url) {
 XMLHttpRequest.prototype.send = function() {
   this.addEventListener('load', function() {
     if (this._url && this._url.includes('virtualsportscontentapi/coupon')) {
-      try {
-        const dados = {
+      console.log('BetGol: dados XHR capturados!', this._url);
+      chrome.runtime.sendMessage({
+        tipo: 'BETGOL_DADOS',
+        dados: {
           url: this._url,
           resposta: this.responseText,
           timestamp: new Date().toISOString(),
-        };
-        // Envia para o background script
-        window.postMessage({
-          tipo: 'BETGOL_DADOS',
-          dados: dados,
-        }, '*');
-      } catch (e) {
-        console.error('BetGol erro:', e);
-      }
+        }
+      });
     }
   });
   return originalSend.apply(this, arguments);
 };
 
-// Intercepta também fetch
+// Intercepta Fetch
 const originalFetch = window.fetch;
 window.fetch = async function(input, init) {
-  const url = typeof input === 'string' ? input : input.url;
+  const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : String(input));
   const resposta = await originalFetch.apply(this, arguments);
-  
+
   if (url && url.includes('virtualsportscontentapi/coupon')) {
     try {
       const clone = resposta.clone();
       const texto = await clone.text();
-      window.postMessage({
+      console.log('BetGol: dados Fetch capturados!', url);
+      chrome.runtime.sendMessage({
         tipo: 'BETGOL_DADOS',
         dados: {
           url: url,
           resposta: texto,
           timestamp: new Date().toISOString(),
-        },
-      }, '*');
+        }
+      });
     } catch (e) {
       console.error('BetGol fetch erro:', e);
     }
   }
-  
+
   return resposta;
 };
-
-// Escuta mensagens do background
-window.addEventListener('message', function(event) {
-  if (event.data && event.data.tipo === 'BETGOL_DADOS') {
-    chrome.runtime.sendMessage(event.data);
-  }
-});
-
-console.log('BetGol Capturador ativo!');
