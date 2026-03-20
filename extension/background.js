@@ -8,63 +8,6 @@ const LIGAS = {
   'C20120653': 'Premier League',
 };
 
-// Armazena requisições em andamento
-const requisicoesAtivas = {};
-
-// Intercepta quando a requisição é iniciada
-chrome.webRequest.onBeforeRequest.addListener(
-  function(details) {
-    if (details.url.includes('virtualsportscontentapi/coupon')) {
-      requisicoesAtivas[details.requestId] = details.url;
-      console.log('BetGol: requisição detectada!', details.url);
-    }
-  },
-  { urls: ['https://www.bet365.bet.br/*'] }
-);
-
-// Intercepta quando a requisição é completada
-chrome.webRequest.onCompleted.addListener(
-  function(details) {
-    if (requisicoesAtivas[details.requestId]) {
-      const url = requisicoesAtivas[details.requestId];
-      delete requisicoesAtivas[details.requestId];
-      console.log('BetGol: requisição completada!', url);
-
-      // Busca o conteúdo via fetch usando o cookie da aba ativa
-      chrome.tabs.query({ url: 'https://www.bet365.bet.br/*' }, async (tabs) => {
-        if (!tabs || tabs.length === 0) return;
-        
-        try {
-          const resultado = await chrome.scripting.executeScript({
-            target: { tabId: tabs[0].id },
-            func: async (fetchUrl) => {
-              try {
-                const resp = await fetch(fetchUrl, { credentials: 'include' });
-                const texto = await resp.text();
-                return texto;
-              } catch (e) {
-                return null;
-              }
-            },
-            args: [url]
-          });
-
-          if (resultado && resultado[0] && resultado[0].result) {
-            const texto = resultado[0].result;
-            const liga = extrairLiga(url);
-            if (liga) {
-              await enviarParaBackend(texto, url, liga);
-            }
-          }
-        } catch (e) {
-          console.error('BetGol erro scripting:', e);
-        }
-      });
-    }
-  },
-  { urls: ['https://www.bet365.bet.br/*'] }
-);
-
 function extrairLiga(url) {
   for (const [id, nome] of Object.entries(LIGAS)) {
     if (url.includes(id)) return nome;
@@ -88,11 +31,8 @@ async function enviarParaBackend(texto, url, liga) {
       chrome.action.setBadgeText({ text: '✓' });
       chrome.action.setBadgeBackgroundColor({ color: '#00ff88' });
       setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2000);
-
-      // Atualiza contador
       chrome.storage.local.get(['contador'], (result) => {
-        const novo = (result.contador || 0) + 1;
-        chrome.storage.local.set({ contador: novo });
+        chrome.storage.local.set({ contador: (result.contador || 0) + 1 });
       });
     }
   } catch (e) {
@@ -152,9 +92,12 @@ function parsearPartida(texto, liga) {
 // Escuta mensagens do content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.tipo === 'BETGOL_DADOS') {
+    console.log('BetGol: mensagem recebida!', message.dados.url);
     const liga = extrairLiga(message.dados.url);
     if (liga) {
       enviarParaBackend(message.dados.resposta, message.dados.url, liga);
     }
   }
 });
+
+console.log('BetGol background ativo!');
