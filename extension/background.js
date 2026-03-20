@@ -18,14 +18,16 @@ function extrairLiga(url) {
 async function enviarParaBackend(texto, url, liga) {
   try {
     const partida = parsearPartida(texto, liga);
-    if (!partida) return;
-
+    if (!partida) {
+      console.warn('BetGol: falha ao parsear partida');
+      return;
+    }
+    console.log('BetGol: enviando partida:', partida);
     const resposta = await fetch(`${BACKEND_URL}/capturar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(partida),
     });
-
     if (resposta.ok) {
       console.log('BetGol: dados enviados!', liga);
       chrome.action.setBadgeText({ text: '✓' });
@@ -34,6 +36,8 @@ async function enviarParaBackend(texto, url, liga) {
       chrome.storage.local.get(['contador'], (result) => {
         chrome.storage.local.set({ contador: (result.contador || 0) + 1 });
       });
+    } else {
+      console.error('BetGol: erro no backend', resposta.status);
     }
   } catch (e) {
     console.error('BetGol envio erro:', e);
@@ -42,46 +46,97 @@ async function enviarParaBackend(texto, url, liga) {
 
 function parsearPartida(texto, liga) {
   try {
+    // ID do evento
     const eventoMatch = texto.match(/\|EV;ID=E(\d+);/);
     if (!eventoMatch) return null;
     const idEvento = eventoMatch[1];
 
-    const times = [];
-    const timeMatches = texto.matchAll(/\|PA;ID=\d+;NA=([^;]+);SU=1;OD=(\d+\/\d+);\|/g);
-    for (const m of timeMatches) {
-      const nome = m[1];
-      if (!nome.includes('Empate') && !nome.includes(' ou ') &&
-          !nome.includes('Mais') && !nome.includes('Menos') &&
-          !nome.includes('Sim') && !nome.includes('Não') &&
-          !nome.includes('Primeiro') && !nome.includes('Último') &&
-          !nome.includes('Gols') && !nome.includes('Gol')) {
-        times.push({ nome, odd: m[2] });
-        if (times.length === 2) break;
+    // Data/hora do evento
+    const dataMatch = texto.match(/CM=([^~]+)~(\d{14})/);
+    const dataEvento = dataMatch ? dataMatch[2] : null;
+
+    // Times e odds do Resultado Final (MG com NA=Resultado Final)
+    // Formato: |PA;ID=...;NA=NomeTime;SU=0;OD=X/Y;|
+    const blocoResultado = texto.match(/NA=Resultado Final[\s\S]*?(?=\|MG;)/);
+    let timeCasa = null, timeEmpate = null, timeFora = null;
+    let oddCasa = null, oddEmpate = null, oddFora = null;
+
+    if (blocoResultado) {
+      const paMatches = [...blocoResultado[0].matchAll(/\|PA;ID=\d+;NA=([^;]+);SU=\d;OD=(\d+\/\d+);/g)];
+      if (paMatches[0]) { timeCasa = paMatches[0][1]; oddCasa = paMatches[0][2]; }
+      if (paMatches[1]) { timeEmpate = paMatches[1][1]; oddEmpate = paMatches[1][2]; }
+      if (paMatches[2]) { timeFora = paMatches[2][1]; oddFora = paMatches[2][2]; }
+    }
+
+    // Fallback: pegar times do título do evento
+    if (!timeCasa || !timeFora) {
+      const cmMatch = texto.match(/CM=([^;~]+)~([^;]+)/);
+      if (cmMatch) {
+        const titulo = cmMatch[1]; // ex: "Turquia v Ucrânia"
+        const timesMatch = titulo.match(/^(.+?)\s+[vx]\s+(.+)$/i);
+        if (timesMatch) {
+          timeCasa = timesMatch[1].trim();
+          timeFora = timesMatch[2].trim();
+        }
       }
     }
 
-    const ambasMatch = texto.match(/NA=Sim;SY=dc;PY=_d;CN=1;\|PA;ID=\d+;OD=(\d+\/\d+);SU=1/);
-    const ambasNaoMatch = texto.match(/NA=Não;SY=dc;PY=_d;CN=1;\|PA;ID=\d+;OD=(\d+\/\d+);SU=1/);
+    // Ambas marcam
+    const blocoAmbas = texto.match(/NA=Para o Time Marcar[\s\S]*?(?=\|MG;)/);
+    let ambasSim = null, ambasNao = null;
+    if (blocoAmbas) {
+      const simMatch = blocoAmbas[0].match(/NA=Sim;SY=dc[^|]*\|PA;ID=\d+;OD=(\d+\/\d+)/);
+      const naoMatch = blocoAmbas[0].match(/NA=Não;SY=dc[^|]*\|PA;ID=\d+;OD=(\d+\/\d+)/);
+      if (simMatch) ambasSim = simMatch[1];
+      if (naoMatch) ambasNao = naoMatch[1];
+    }
 
+    // Placares corretos
+    const blocoPlacares = texto.match(/NA=Resultado Correto;[\s\S]*?(?=\|MG;SY=dz;NA=Resultado Correto - Grupo)/);
     const placares = [];
-    const placarMatches = texto.matchAll(/NA=(\d+-\d+);HD=;HA=;OD=(\d+\/\d+);SU=1;/g);
-    for (const m of placarMatches) {
-      placares.push({ placar: m[1], odd: m[2] });
+    if (blocoPlacares) {
+      const placarMatches = [...blocoPlacares[0].matchAll(/NA=(\d+-\d+);HD=;HA=;OD=(\d+\/\d+);SU=\d;/g)];
+      for (const m of placarMatches) {
+        placares.push({ placar: m[1], odd: m[2] });
+      }
+    }
+
+    // Gols mais/menos 2.5
+    const bloco25 = texto.match(/NA=2\.5;[\s\S]{0,200}?NA=Mais de[\s\S]*?OD=(\d+\/\d+)[\s\S]*?NA=Menos de[\s\S]*?OD=(\d+\/\d+)/);
+    let mais25 = null, menos25 = null;
+    if (bloco25) {
+      mais25 = bloco25[1];
+      menos25 = bloco25[2];
+    }
+
+    // Primeiro marcador
+    const primeiroMarcador = [];
+    const blocoMarcador = texto.match(/NA=Primeiro Marcador de Gol[\s\S]*?(?=\|MG;)/);
+    if (blocoMarcador) {
+      const marcMatches = [...blocoMarcador[0].matchAll(/NA=([^;]+);SU=\d;OD=(\d+\/\d+);/g)];
+      for (const m of marcMatches) {
+        if (!m[1].includes('Qualquer outro')) {
+          primeiroMarcador.push({ jogador: m[1], odd: m[2] });
+        }
+      }
     }
 
     return {
       liga,
       id_evento: idEvento,
+      data_evento: dataEvento,
       timestamp: new Date().toISOString(),
-      time_casa: times[0]?.nome || 'Casa',
-      time_fora: times[1]?.nome || 'Fora',
-      odd_casa: times[0]?.odd || null,
-      odd_fora: times[1]?.odd || null,
-      ambas_marcam_sim: ambasMatch ? ambasMatch[1] : null,
-      ambas_marcam_nao: ambasNaoMatch ? ambasNaoMatch[1] : null,
+      time_casa: timeCasa || 'Casa',
+      time_fora: timeFora || 'Fora',
+      odd_casa: oddCasa,
+      odd_empate: oddEmpate,
+      odd_fora: oddFora,
+      ambas_marcam_sim: ambasSim,
+      ambas_marcam_nao: ambasNao,
+      mais_2_5: mais25,
+      menos_2_5: menos25,
       placares,
-      placar_casa: null,
-      placar_fora: null,
+      primeiro_marcador: primeiroMarcador,
     };
   } catch (e) {
     console.error('Erro parsear:', e);
@@ -96,6 +151,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const liga = extrairLiga(message.dados.url);
     if (liga) {
       enviarParaBackend(message.dados.resposta, message.dados.url, liga);
+    } else {
+      console.log('BetGol: liga não reconhecida na URL', message.dados.url);
     }
   }
 });
