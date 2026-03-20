@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import GradeResultados from '../components/GradeResultados'
 import Estatisticas from '../components/Estatisticas'
 import Sequencias from '../components/Sequencias'
+import Sugestoes from '../components/Sugestoes'
 
 function Dashboard() {
   const [ligaSelecionada, setLigaSelecionada] = useState('Express Cup')
   const [resultados, setResultados] = useState([])
+  const [analise, setAnalise] = useState<any>(null)
   const [carregando, setCarregando] = useState(true)
 
   const ligas = [
@@ -18,16 +20,25 @@ function Dashboard() {
 
   useEffect(() => {
     buscarDados()
-    const intervalo = setInterval(buscarDados, 3 * 60 * 1000)
+    const intervalo = setInterval(buscarDados, 60 * 1000)
     return () => clearInterval(intervalo)
   }, [ligaSelecionada])
 
   async function buscarDados() {
     try {
       setCarregando(true)
-      const resposta = await fetch(`${(import.meta as any).env.VITE_API_URL}/resultados?liga=${ligaSelecionada}`)
-      const dados = await resposta.json()
-      setResultados(dados)
+      const API = (import.meta as any).env.VITE_API_URL
+
+      const [resResultados, resAnalise] = await Promise.all([
+        fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`),
+        fetch(`${API}/analise?liga=${encodeURIComponent(ligaSelecionada)}`),
+      ])
+
+      const dadosResultados = await resResultados.json()
+      const dadosAnalise = await resAnalise.json()
+
+      setResultados(dadosResultados)
+      setAnalise(dadosAnalise)
     } catch (erro) {
       console.error('Erro ao buscar dados:', erro)
     } finally {
@@ -37,11 +48,16 @@ function Dashboard() {
 
   return (
     <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px', gap: '16px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#00ff88' }}>
-          ⚽ BetGol
-        </h1>
-        <span style={{ color: '#888', fontSize: '14px' }}>Análise de Futebol Virtual</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#00ff88' }}>
+            ⚽ BetGol
+          </h1>
+          <span style={{ color: '#888', fontSize: '14px' }}>Análise de Futebol Virtual</span>
+        </div>
+        <div style={{ fontSize: '12px', color: '#555', background: '#1a1d27', padding: '6px 12px', borderRadius: '20px' }}>
+          🔄 Atualiza a cada 1 min
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -72,6 +88,7 @@ function Dashboard() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <Sugestoes analise={analise} liga={ligaSelecionada} />
           <GradeResultados resultados={resultados} />
           <Estatisticas resultados={resultados} />
           <Sequencias resultados={resultados} />
