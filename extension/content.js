@@ -1,5 +1,33 @@
 console.log('BetGol Capturador ativo!');
 
+// Intercepta WebSocket
+const OriginalWebSocket = window.WebSocket;
+window.WebSocket = function(url, protocols) {
+  const ws = protocols ? new OriginalWebSocket(url, protocols) : new OriginalWebSocket(url);
+  
+  ws.addEventListener('message', function(event) {
+    try {
+      const dados = event.data;
+      if (typeof dados === 'string' && dados.includes('virtualsports')) {
+        console.log('BetGol: dados WebSocket capturados!', url);
+        chrome.runtime.sendMessage({
+          tipo: 'BETGOL_DADOS',
+          dados: {
+            url: url,
+            resposta: dados,
+            timestamp: new Date().toISOString(),
+          }
+        });
+      }
+    } catch (e) {
+      console.error('BetGol WS erro:', e);
+    }
+  });
+  
+  return ws;
+};
+window.WebSocket.prototype = OriginalWebSocket.prototype;
+
 // Intercepta XHR
 const originalOpen = XMLHttpRequest.prototype.open;
 const originalSend = XMLHttpRequest.prototype.send;
