@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 300px;
+      background: #0f1117;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      font-size: 20px;
+      color: #00ff88;
+      font-weight: bold;
+    }
+    .status {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+    .status.ativo {
+      background: #1a5c2a;
+      color: #00ff88;
+      border-left: 3px solid #00ff88;
+    }
+    .status.inativo {
+      background: #5c1a1a;
+      color: #ff4444;
+      border-left: 3px solid #ff4444;
+    }
+    .info {
+      background: #1a1d27;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+    .contador {
+      background: #1a1d27;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .contador span:first-child {
+      font-size: 12px;
+      color: #888;
+    }
+    .contador span:last-child {
+      font-size: 20px;
+      font-weight: bold;
+      color: #00ff88;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+      margin-top: 12px;
+      background: #00ff88;
+      color: #000;
+    }
+    .btn:hover { background: #00cc70; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span>⚽</span>
+    <h1>BetGol</h1>
+  </div>
+
+  <div id="status" class="status inativo">
+    ⚠️ Acesse bet365.bet.br para ativar
+  </div>
+
+  <div class="info">
+    A extensão captura automaticamente os dados do futebol virtual enquanto você navega na Bet365.
+  </div>
+
+  <div class="contador">
+    <span>Partidas capturadas hoje</span>
+    <span id="contador">0</span>
+  </div>
+
+  <button class="btn" onclick="abrirApp()">
+    Abrir BetGol App ↗
+  </button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
