@@ -144,6 +144,17 @@ function parsearPartida(texto, liga) {
   }
 }
 
+// Injeta content.js quando a aba da Bet365 carregar
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'loading' && tab.url && tab.url.includes('bet365.bet.br')) {
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ['content.js'],
+      world: 'MAIN',
+    }).catch(e => console.error('BetGol injeção erro:', e));
+  }
+});
+
 // Escuta mensagens do content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.tipo === 'BETGOL_DADOS') {
