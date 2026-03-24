@@ -1,3 +1,5 @@
+if (!window._betgolAtivo) {
+window._betgolAtivo = true;
 console.log('BetGol Capturador ativo!');
 
 // Intercepta Fetch
@@ -91,3 +93,4 @@ window.WebSocket = function(url, protocols) {
   return ws;
 };
 window.WebSocket.prototype = OriginalWebSocket.prototype;
+}
