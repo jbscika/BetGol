@@ -31,8 +31,8 @@ function Dashboard() {
     try {
       setCarregando(true)
       setErro(null)
-      const slug = LIGAS[ligaSelecionada] || 'copa'
-      const url = `https://v2.analisetips.com/resultados/365/${slug}?bet=365&league=${slug}&page=1&rows=720&options[]=resultsNames`
+      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      const url = `${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`
       const resp = await fetch(url)
       const json = await resp.json()
       if (!json.data?.resultsNames) throw new Error('Dados inválidos')
