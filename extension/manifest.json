@@ -19,14 +19,10 @@
   "content_scripts": [
     {
       "matches": ["https://www.bet365.bet.br/*"],
-      "js": ["injector.js"],
-      "run_at": "document_start"
-    },
-    {
-      "matches": ["https://www.bet365.bet.br/*"],
       "js": ["content.js"],
       "run_at": "document_start",
-      "world": "MAIN"
+      "world": "MAIN",
+      "all_frames": true
     }
   ],
   "action": {
@@ -34,7 +30,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["content.js"],
+      "resources": ["content.js", "injector.js"],
       "matches": ["https://www.bet365.bet.br/*"]
     }
   ]
