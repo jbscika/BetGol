@@ -16,15 +16,7 @@
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": ["https://www.bet365.bet.br/*"],
-      "js": ["content.js"],
-      "run_at": "document_start",
-      "world": "MAIN",
-      "all_frames": true
-    }
-  ],
+  "content_scripts": [],
   "action": {
     "default_popup": "popup.html"
   },
