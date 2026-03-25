@@ -1,158 +1,72 @@
-import { useState, useEffect } from 'react'
-import GradeResultados from '../components/GradeResultados'
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+const { db } = require('./firebase');
 
-const LIGAS: Record<string, string> = {
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+const SLUGS_LIGA = {
   'Copa do Mundo': 'copa',
   'Euro Cup': 'euro',
   'Premier League': 'premier',
-  'Super Liga': 'superliga',
-  'Express Cup': 'expresscup',
-}
+  'Super Liga': 'super',
+};
 
-export interface Partida {
-  [key: string]: string | null
-}
+app.get('/', (req, res) => {
+  res.json({ status: 'BetGol API rodando!' });
+});
 
-function Dashboard() {
-  const [ligaSelecionada, setLigaSelecionada] = useState('Copa do Mundo')
-  const [linhas, setLinhas] = useState<Partida[]>([])
-  const [colunas, setColunas] = useState<string[]>([])
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-  const [totalPartidas, setTotalPartidas] = useState(0)
+// Proxy para API do AnaliseTips
+app.get('/resultados', async (req, res) => {
+  try {
+    const liga = req.query.liga || 'Copa do Mundo';
+    const slug = SLUGS_LIGA[liga] || 'copa';
+    const token = process.env.ANALISETIPS_TOKEN;
 
-  useEffect(() => {
-    buscarDados()
-    const intervalo = setInterval(buscarDados, 60 * 1000)
-    return () => clearInterval(intervalo)
-  }, [ligaSelecionada])
-
-  async function buscarDados() {
-    try {
-      setCarregando(true)
-      setErro(null)
-      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
-      const url = `${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`
-      const resp = await fetch(url)
-      const json = await resp.json()
-      if (!json.data?.resultsNames) throw new Error('Dados inválidos')
-      const dados = json.data.resultsNames
-      setLinhas(dados.linhas || [])
-      setColunas(dados.colunas || [])
-      setTotalPartidas((dados.linhas || []).length)
-    } catch (e: any) {
-      setErro('Erro ao carregar dados. Tente novamente.')
-      console.error(e)
-    } finally {
-      setCarregando(false)
+    if (!token) {
+      return res.status(500).json({ error: 'Token não configurado' });
     }
+
+    const url = `https://v2robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&options[]=resultsNames`;
+
+    const resp = await axios.get(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+        'Origin': 'https://v2.analisetips.com',
+        'Referer': 'https://v2.analisetips.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'x-requested-with': 'XMLHttpRequest',
+      },
+      timeout: 15000,
+    });
+
+    res.json(resp.data);
+  } catch (e) {
+    console.error('Erro ao buscar AnaliseTips:', e.message);
+    res.status(500).json({ error: 'Erro ao buscar dados', message: e.message });
   }
+});
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e0e0f0', fontFamily: 'sans-serif' }}>
-      {/* HEADER */}
-      <header style={{
-        background: '#12121a',
-        borderBottom: '2px solid #00ff88',
-        padding: '12px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-      }}>
-        <div style={{ fontSize: '26px', fontWeight: 'bold', letterSpacing: '2px' }}>
-          <span style={{ color: '#00ff88' }}>BET</span>
-          <span style={{ color: '#e0e0f0' }}>GOL</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#8888aa' }}>
-          <div style={{
-            width: '8px', height: '8px', borderRadius: '50%',
-            background: carregando ? '#f5c518' : '#00ff88',
-            animation: 'pulse 1.5s infinite',
-          }} />
-          {carregando ? 'Carregando...' : `${totalPartidas} partidas`}
-        </div>
-      </header>
+// Recebe dados da extensão Chrome
+app.post('/capturar', async (req, res) => {
+  try {
+    const partida = req.body;
+    if (!partida || !partida.liga || !partida.id_evento) {
+      return res.status(400).json({ erro: 'Dados inválidos' });
+    }
+    await db.collection('partidas').doc(`${partida.liga}-${partida.id_evento}`).set(partida, { merge: true });
+    console.log(`Partida salva: ${partida.time_casa} vs ${partida.time_fora} - ${partida.liga}`);
+    res.json({ sucesso: true });
+  } catch (e) {
+    console.error('Erro ao salvar partida:', e);
+    res.status(500).json({ erro: 'Erro interno' });
+  }
+});
 
-      {/* LIGA TABS */}
-      <div style={{
-        display: 'flex',
-        gap: 0,
-        background: '#12121a',
-        borderBottom: '1px solid #2a2a3a',
-        overflowX: 'auto',
-        padding: '0 20px',
-      }}>
-        {Object.keys(LIGAS).map(liga => (
-          <button
-            key={liga}
-            onClick={() => setLigaSelecionada(liga)}
-            style={{
-              padding: '10px 20px',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: ligaSelecionada === liga ? '3px solid #00ff88' : '3px solid transparent',
-              color: ligaSelecionada === liga ? '#00ff88' : '#8888aa',
-              fontWeight: 'bold',
-              fontSize: '13px',
-              letterSpacing: '1px',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s',
-            }}
-          >
-            {liga.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
-      {/* CONTEÚDO */}
-      <div style={{ padding: '16px 20px' }}>
-        {carregando ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#8888aa' }}>
-            <div style={{
-              width: '40px', height: '40px',
-              border: '3px solid #2a2a3a',
-              borderTopColor: '#00ff88',
-              borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-              margin: '0 auto 16px',
-            }} />
-            Buscando dados...
-          </div>
-        ) : erro ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#e8334a' }}>
-            {erro}
-            <br />
-            <button
-              onClick={buscarDados}
-              style={{
-                marginTop: '12px',
-                padding: '8px 20px',
-                background: '#e8334a',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-              }}
-            >
-              TENTAR NOVAMENTE
-            </button>
-          </div>
-        ) : (
-          <GradeResultados linhas={linhas} colunas={colunas} />
-        )}
-      </div>
-
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        @keyframes spin { to{transform:rotate(360deg)} }
-      `}</style>
-    </div>
-  )
-}
-
-export default Dashboard
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`BetGol backend rodando na porta ${PORT}`);
+});
