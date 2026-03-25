@@ -11,6 +11,8 @@ const SLUGS_LIGA = {
   'Copa do Mundo': 'copa',
   'Euro Cup': 'euro',
   'Premier League': 'premier',
+  'Super Liga Sul-Americana': 'superliga',
+  'Express Cup': 'expresscup',
   'Super Liga': 'super',
 };
 
@@ -29,7 +31,7 @@ app.get('/resultados', async (req, res) => {
       return res.status(500).json({ error: 'Token não configurado' });
     }
 
-    const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&options[]=resultsNames`;
+    const url = `https://v2robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&options[]=resultsNames`;
 
     const resp = await axios.get(url, {
       headers: {
