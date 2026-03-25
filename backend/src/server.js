@@ -11,8 +11,7 @@ const SLUGS_LIGA = {
   'Copa do Mundo': 'copa',
   'Euro Cup': 'euro',
   'Premier League': 'premier',
-  'Super Liga Sul-Americana': 'superliga',
-  'Express Cup': 'expresscup',
+  'Super Liga': 'super',
 };
 
 app.get('/', (req, res) => {
