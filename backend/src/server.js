@@ -11,7 +11,7 @@ const SLUGS_LIGA = {
   'Copa do Mundo': 'copa',
   'Euro Cup': 'euro',
   'Premier League': 'premier',
-  'Super Liga': 'superliga',
+  'Super Liga Sul-Americana': 'superliga',
   'Express Cup': 'expresscup',
 };
 
@@ -19,19 +19,31 @@ app.get('/', (req, res) => {
   res.json({ status: 'BetGol API rodando!' });
 });
 
-// Proxy para API do AnaliseTips (resolve CORS)
+// Proxy para API do AnaliseTips
 app.get('/resultados', async (req, res) => {
   try {
     const liga = req.query.liga || 'Copa do Mundo';
     const slug = SLUGS_LIGA[liga] || 'copa';
-    const url = `https://v2.analisetips.com/resultados/365/${slug}?bet=365&league=${slug}&page=1&rows=720&options[]=resultsNames`;
+    const token = process.env.ANALISETIPS_TOKEN;
+
+    if (!token) {
+      return res.status(500).json({ error: 'Token não configurado' });
+    }
+
+    const url = `https://v2robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&options[]=resultsNames`;
+
     const resp = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
+        'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
+        'Origin': 'https://v2.analisetips.com',
+        'Referer': 'https://v2.analisetips.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'x-requested-with': 'XMLHttpRequest',
       },
       timeout: 15000,
     });
+
     res.json(resp.data);
   } catch (e) {
     console.error('Erro ao buscar AnaliseTips:', e.message);
