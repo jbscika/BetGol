@@ -29,7 +29,7 @@ app.get('/resultados', async (req, res) => {
       return res.status(500).json({ error: 'Token não configurado' });
     }
 
-    const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&options[]=resultsNames`;
+    const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&method=resultsBoth`;
 
     const resp = await axios.get(url, {
       headers: {
