@@ -166,7 +166,7 @@ function Dashboard() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <IATendencia linhas={linhas} />
+            <IATendencia linhas={linhas} colunas={colunas} />
             <GradeResultados linhas={linhas} colunas={colunas} />
           </div>
         )}
