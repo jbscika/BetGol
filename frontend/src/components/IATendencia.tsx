@@ -3,6 +3,7 @@ import { Partida } from '../pages/Dashboard'
 
 interface Props {
   linhas: Partida[]
+  colunas?: string[]
 }
 
 interface Analise {
@@ -23,7 +24,7 @@ interface Analise {
   }[]
 }
 
-const HORARIOS = ['01','04','07','10','13','16','19','22','25','28','31','34','37','40','43','46','49','52','55','58']
+const HORARIOS_DEFAULT = ['01','04','07','10','13','16','19','22','25','28','31','34','37','40','43','46','49','52','55','58']
 
 function extrairPlacar(val: string | null): { casa: number; fora: number } | null {
   if (!val) return null
@@ -33,14 +34,13 @@ function extrairPlacar(val: string | null): { casa: number; fora: number } | nul
   return { casa: parseInt(m[1]), fora: parseInt(m[2]) }
 }
 
-function analisarPartidas(linhas: Partida[]): Analise {
-  // Pegar todas as células das últimas 24 linhas (aprox 24h)
+function analisarPartidas(linhas: Partida[], colunas: string[]): Analise {
   const ultimas24 = linhas.slice(0, 24)
   const placares: { casa: number; fora: number }[] = []
 
   ultimas24.forEach(linha => {
-    HORARIOS.forEach(h => {
-      const p = extrairPlacar(linha[`tempo${h}`] as string)
+    colunas.forEach(col => {
+      const p = extrairPlacar(linha[col] as string)
       if (p) placares.push(p)
     })
   })
@@ -78,8 +78,8 @@ function analisarPartidas(linhas: Partida[]): Analise {
   // Sequência atual (últimas partidas em ordem)
   const ultimasPartidas: { casa: number; fora: number }[] = []
   for (const linha of ultimas24.slice(0, 5)) {
-    for (const h of HORARIOS) {
-      const p = extrairPlacar(linha[`tempo${h}`] as string)
+    for (const col of colunas) {
+      const p = extrairPlacar(linha[col] as string)
       if (p) ultimasPartidas.push(p)
     }
   }
@@ -223,14 +223,15 @@ const COR_CONFIANCA = {
   BAIXA: '#e8334a',
 }
 
-export default function IATendencia({ linhas }: Props) {
+export default function IATendencia({ linhas, colunas }: Props) {
   const [analise, setAnalise] = useState<Analise>(gerarAnaliseVazia())
+  const cols = colunas && colunas.length > 0 ? colunas : HORARIOS_DEFAULT
 
   useEffect(() => {
     if (linhas.length > 0) {
-      setAnalise(analisarPartidas(linhas))
+      setAnalise(analisarPartidas(linhas, cols))
     }
-  }, [linhas])
+  }, [linhas, colunas])
 
   if (analise.totalPartidas === 0) {
     return (
