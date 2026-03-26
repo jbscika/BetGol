@@ -138,7 +138,7 @@ export default function GradeResultados({ linhas }: Props) {
           <button
             onClick={aplicar}
             style={{
-              background: '#f5c518', color: '#000',
+              background: '#00e676', color: '#000',
               border: 'none', padding: '7px 18px',
               fontWeight: 'bold', fontSize: '13px',
               letterSpacing: '1px', borderRadius: '4px',
@@ -189,7 +189,7 @@ export default function GradeResultados({ linhas }: Props) {
             Normal
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: '#f5c518' }} />
+            <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: '#00e676' }} />
             Filtrado
           </div>
         </div>
@@ -253,8 +253,8 @@ export default function GradeResultados({ linhas }: Props) {
                             fontWeight: 'bold',
                             fontSize: '12px',
                             letterSpacing: '0.5px',
-                            background: destaque ? '#f5c518' : '#e8334a',
-                            color: destaque ? '#000' : '#fff',
+                            background: destaque ? '#00e676' : '#e8334a',
+                            color: '#fff',
                             minWidth: '42px',
                             textAlign: 'center',
                             cursor: 'default',
