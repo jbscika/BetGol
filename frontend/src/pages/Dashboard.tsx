@@ -42,9 +42,12 @@ function Dashboard() {
       const json = await resp.json()
       if (!json.data) throw new Error('Dados inválidos')
       const dados = json.data
-      setLinhas(dados.linhas || [])
-      setColunas(dados.colunas || [])
-      setTotalPartidas((dados.linhas || []).length)
+      // Suporta tanto resultsNames quanto resultsBoth
+      const linhasData = dados.linhas || dados.resultados || dados.rows || []
+      const colunasData = dados.colunas || ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+      setLinhas(linhasData)
+      setColunas(colunasData)
+      setTotalPartidas(linhasData.length)
     } catch (e: any) {
       setErro('Erro ao carregar dados. Tente novamente.')
       console.error(e)
