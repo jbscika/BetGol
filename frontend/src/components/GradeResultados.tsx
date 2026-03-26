@@ -17,7 +17,7 @@ const HORARIOS = ['01','04','07','10','13','16','19','22','25','28','31','34','3
 
 function extrairPlacar(val: string | null): { casa: number; fora: number; texto: string } | null {
   if (!val) return null
-  const linha = val.split('<br>')[0].split('\n')[0]
+  const linha = val.split('</br>')[0].split('<br>')[0].split('\n')[0]
   const m = linha.match(/(\d+)\s*-\s*(\d+)/)
   if (!m) return null
   return { casa: parseInt(m[1]), fora: parseInt(m[2]), texto: `${m[1]}-${m[2]}` }
