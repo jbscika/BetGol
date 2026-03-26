@@ -40,8 +40,8 @@ function Dashboard() {
       const url = `${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`
       const resp = await fetch(url)
       const json = await resp.json()
-      if (!json.data?.resultsNames) throw new Error('Dados inválidos')
-      const dados = json.data.resultsNames
+      if (!json.data) throw new Error('Dados inválidos')
+      const dados = json.data
       setLinhas(dados.linhas || [])
       setColunas(dados.colunas || [])
       setTotalPartidas((dados.linhas || []).length)
