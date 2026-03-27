@@ -138,7 +138,7 @@ export default function GradeResultados({ linhas }: Props) {
           <button
             onClick={aplicar}
             style={{
-              background: '#00e676', color: '#000',
+              background: '#00c853', color: '#000',
               border: 'none', padding: '7px 18px',
               fontWeight: 'bold', fontSize: '13px',
               letterSpacing: '1px', borderRadius: '4px',
@@ -185,11 +185,11 @@ export default function GradeResultados({ linhas }: Props) {
         <span style={{ fontSize: '13px', color: '#8888aa' }}>{linhas.length} rodadas</span>
         <div style={{ display: 'flex', gap: '14px', fontSize: '12px', color: '#8888aa' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: '#e8334a' }} />
+            <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: '#8b1a1a' }} />
             Normal
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: '#00e676' }} />
+            <div style={{ width: '14px', height: '14px', borderRadius: '3px', background: '#00c853' }} />
             Filtrado
           </div>
         </div>
@@ -253,7 +253,7 @@ export default function GradeResultados({ linhas }: Props) {
                             fontWeight: 'bold',
                             fontSize: '12px',
                             letterSpacing: '0.5px',
-                            background: destaque ? '#00e676' : '#e8334a',
+                            background: destaque ? '#00c853' : '#8b1a1a',
                             color: '#fff',
                             minWidth: '42px',
                             textAlign: 'center',
