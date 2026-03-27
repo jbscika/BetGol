@@ -73,9 +73,9 @@ function Dashboard() {
         zIndex: 100,
       }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '32px', fontWeight: 800, letterSpacing: '3px', display: 'flex', alignItems: 'center', gap: '2px' }}>
-          <span style={{ color: '#00e676' }}>BET</span>
+          <span style={{ color: '#00c853' }}>BET</span>
           <div style={{
-            width: '8px', height: '8px', background: '#00e676',
+            width: '8px', height: '8px', background: '#00c853',
             borderRadius: '50%', margin: '0 4px',
             animation: 'blink 2s infinite',
           }} />
@@ -83,7 +83,7 @@ function Dashboard() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{
-            background: '#ff1744', color: '#fff',
+            background: '#8b1a1a', color: '#fff',
             fontFamily: "'Barlow Condensed', sans-serif",
             fontSize: '11px', fontWeight: 700, letterSpacing: '2px',
             padding: '3px 8px', borderRadius: '2px',
@@ -93,7 +93,7 @@ function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#607d8b' }}>
             <div style={{
               width: '8px', height: '8px', borderRadius: '50%',
-              background: carregando ? '#ffd600' : '#00e676',
+              background: carregando ? '#b8960c' : '#00c853',
             }} />
             {carregando ? 'Carregando...' : `${totalPartidas} partidas`}
           </div>
@@ -117,7 +117,7 @@ function Dashboard() {
               background: 'transparent',
               border: 'none',
               borderBottom: ligaSelecionada === liga ? '3px solid #00e676' : '3px solid transparent',
-              color: ligaSelecionada === liga ? '#00e676' : '#607d8b',
+              color: ligaSelecionada === liga ? '#00c853' : '#607d8b',
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 600,
               fontSize: '13px',
@@ -139,7 +139,7 @@ function Dashboard() {
             <div style={{
               width: '40px', height: '40px',
               border: '3px solid #1e2d33',
-              borderTopColor: '#00e676',
+              borderTopColor: '#00c853',
               borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
               margin: '0 auto 16px',
@@ -147,14 +147,14 @@ function Dashboard() {
             Buscando dados...
           </div>
         ) : erro ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: '#ff1744' }}>
+          <div style={{ textAlign: 'center', padding: '60px', color: '#8b1a1a' }}>
             {erro}
             <br />
             <button
               onClick={buscarDados}
               style={{
                 marginTop: '16px', padding: '8px 24px',
-                background: '#ff1744', color: '#fff',
+                background: '#8b1a1a', color: '#fff',
                 border: 'none', borderRadius: '4px',
                 cursor: 'pointer', fontWeight: 'bold',
                 fontFamily: "'Barlow Condensed', sans-serif",
