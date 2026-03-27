@@ -144,16 +144,19 @@ function parsearPartida(texto, liga) {
   }
 }
 
-// Injeta content.js quando a aba da Bet365 carregar
+// Injeta content.js quando a aba da Bet365 carregar completamente
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url && tab.url.includes('bet365.bet.br')) {
-    chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      files: ['content.js'],
-      world: 'MAIN',
-    }).then(() => {
-      console.log('BetGol: content.js injetado na aba', tabId);
-    }).catch(e => console.error('BetGol injeção erro:', e));
+    // Aguarda 2 segundos para a página terminar de inicializar
+    setTimeout(() => {
+      chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ['content.js'],
+        world: 'MAIN',
+      }).then(() => {
+        console.log('BetGol: content.js injetado na aba', tabId);
+      }).catch(e => console.error('BetGol injeção erro:', e));
+    }, 2000);
   }
 });
 
