@@ -4,6 +4,7 @@ import { Partida } from '../pages/Dashboard'
 interface Props {
   linhas: Partida[]
   colunas: string[]
+  liga?: string
 }
 
 interface PlacarInfo {
@@ -182,7 +183,7 @@ function calcularTendencias(linhas: Partida[], colunas: string[], tipoIA: number
 
 const FILTRO_VAZIO = { over: '', under: '', ambas: '', resultado: '' }
 
-export default function GradeResultados({ linhas, colunas }: Props) {
+export default function GradeResultados({ linhas, colunas, liga }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
   const [tipoIA, setTipoIA] = useState<1 | 2 | 3>(1)
@@ -237,8 +238,8 @@ export default function GradeResultados({ linhas, colunas }: Props) {
 
   const c = {
     bg: '#080c0e', bg2: '#0d1214', bg3: '#131a1d', bg4: '#1a2328',
-    borda: '#1e2d33', verde: '#1a4a2e', vermelho: '#4a1a1a',
-    verdeClaro: '#00c853', vermelhoClaro: '#c62828',
+    borda: '#1e2d33', verde: '#1a4a2e', vermelho: '#6b0f0f',
+    verdeClaro: '#00c853', vermelhoClaro: '#e53935',
     texto: '#cfd8dc', texto2: '#607d8b', amarelo: '#b8960c', azul: '#1565c0',
   }
 
@@ -322,21 +323,22 @@ export default function GradeResultados({ linhas, colunas }: Props) {
         if (melhores.length === 0) return null
         return (
           <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '14px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.verdeClaro, animation: 'pulse 1.5s infinite' }} />
               <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>
                 MELHORES ENTRADAS — PRÓXIMA PARTIDA
               </span>
-              <span style={{ fontSize: '11px', color: c.texto2, marginLeft: '8px' }}>IA TIPO {tipoIA}</span>
+              <span style={{ fontSize: '11px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
+              {liga && <span style={{ fontSize: '11px', background: '#1565c022', color: '#2979ff', border: '1px solid #1565c044', borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {melhores.map((t, i) => (
                 <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '120px' }}>
                   <div style={{ fontSize: '11px', color: c.texto2, marginBottom: '4px', letterSpacing: '1px' }}>MIN {t.minuto}</div>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: c.verdeClaro, fontFamily: 'monospace', lineHeight: 1 }}>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#2979ff', fontFamily: 'monospace', lineHeight: 1 }}>
                     {t.probabilidade}%
                   </div>
-                  <div style={{ fontSize: '10px', color: '#4a9a6a', marginTop: '2px' }}>
+                  <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>
                     Confiança: {t.confianca}%
                   </div>
                   <div style={{ fontSize: '10px', color: c.texto2, marginTop: '3px', maxWidth: '140px' }}>
@@ -378,8 +380,8 @@ export default function GradeResultados({ linhas, colunas }: Props) {
                     <td key={col} title={t?.motivo} style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '3px 2px', textAlign: 'center' }}>
                       {t ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 800, color: t.direcao === 'GREEN' ? c.verdeClaro : c.vermelhoClaro }}>{t.probabilidade}%</span>
-                          <span style={{ fontSize: '9px', color: '#4a7fb5' }}>{t.confianca}%</span>
+                          <span style={{ fontSize: '11px', fontWeight: 800, color: '#2979ff' }}>{t.probabilidade}%</span>
+                          <span style={{ fontSize: '9px', color: c.verdeClaro }}>{t.confianca}%</span>
                         </div>
                       ) : <span style={{ color: c.borda }}>—</span>}
                     </td>
