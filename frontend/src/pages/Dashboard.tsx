@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import GradeResultados from '../components/GradeResultados'
 import IATendencia from '../components/IATendencia'
 
@@ -27,10 +27,28 @@ function Dashboard() {
 
   useEffect(() => {
     const intervalo = setInterval(() => {
-      buscarDados()
+      buscarDadosSilencioso()
     }, 120 * 1000)
     return () => clearInterval(intervalo)
   }, [ligaSelecionada])
+
+  async function buscarDadosSilencioso() {
+    try {
+      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      const url = `${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`
+      const resp = await fetch(url)
+      const json = await resp.json()
+      if (!json.data) return
+      const dados = json.data
+      const linhasData = dados.linhas || dados.resultados || dados.rows || []
+      const colunasData = dados.colunas || ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+      setLinhas(linhasData)
+      setColunas(colunasData)
+      setTotalPartidas(linhasData.length)
+    } catch (e) {
+      console.error('Erro na atualização silenciosa:', e)
+    }
+  }
 
   async function buscarDados() {
     try {
@@ -42,7 +60,6 @@ function Dashboard() {
       const json = await resp.json()
       if (!json.data) throw new Error('Dados inválidos')
       const dados = json.data
-      // Suporta tanto resultsNames quanto resultsBoth
       const linhasData = dados.linhas || dados.resultados || dados.rows || []
       const colunasData = dados.colunas || ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
       setLinhas(linhasData)
