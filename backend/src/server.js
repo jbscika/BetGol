@@ -31,17 +31,27 @@ app.get('/resultados', async (req, res) => {
 
     const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&method=resultsBoth`;
 
-    const resp = await axios.get(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-        'Origin': 'https://v2.analisetips.com',
-        'Referer': 'https://v2.analisetips.com/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'x-requested-with': 'XMLHttpRequest',
-      },
-      timeout: 15000,
-    });
+    let resp;
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      try {
+        resp = await axios.get(url, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Origin': 'https://v2.analisetips.com',
+            'Referer': 'https://v2.analisetips.com/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'x-requested-with': 'XMLHttpRequest',
+          },
+          timeout: 30000,
+        });
+        break;
+      } catch (err) {
+        if (tentativa === 3) throw err;
+        console.log(`Tentativa ${tentativa} falhou, tentando novamente...`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
 
     res.json(resp.data);
   } catch (e) {
