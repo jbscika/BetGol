@@ -237,7 +237,7 @@ export default function GradeResultados({ linhas, colunas }: Props) {
 
   const c = {
     bg: '#080c0e', bg2: '#0d1214', bg3: '#131a1d', bg4: '#1a2328',
-    borda: '#1e2d33', verde: '#2d7a4f', vermelho: '#7a2d2d',
+    borda: '#1e2d33', verde: '#1a4a2e', vermelho: '#4a1a1a',
     verdeClaro: '#00c853', vermelhoClaro: '#c62828',
     texto: '#cfd8dc', texto2: '#607d8b', amarelo: '#b8960c', azul: '#1565c0',
   }
@@ -312,6 +312,45 @@ export default function GradeResultados({ linhas, colunas }: Props) {
           <button onClick={limpar} style={{ background: 'transparent', color: c.texto2, border: `1px solid ${c.borda}`, padding: '7px 14px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
         </div>
       </div>
+
+      {/* PAINEL APOSTAR AGORA */}
+      {mostrarIA && tendencias.length > 0 && (() => {
+        const melhores = tendencias
+          .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
+          .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
+          .slice(0, 5)
+        if (melhores.length === 0) return null
+        return (
+          <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.verdeClaro, animation: 'pulse 1.5s infinite' }} />
+              <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>
+                MELHORES ENTRADAS — PRÓXIMA PARTIDA
+              </span>
+              <span style={{ fontSize: '11px', color: c.texto2, marginLeft: '8px' }}>IA TIPO {tipoIA}</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {melhores.map((t, i) => (
+                <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '120px' }}>
+                  <div style={{ fontSize: '11px', color: c.texto2, marginBottom: '4px', letterSpacing: '1px' }}>MIN {t.minuto}</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: c.verdeClaro, fontFamily: 'monospace', lineHeight: 1 }}>
+                    {t.probabilidade}%
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#4a9a6a', marginTop: '2px' }}>
+                    Confiança: {t.confianca}%
+                  </div>
+                  <div style={{ fontSize: '10px', color: c.texto2, marginTop: '3px', maxWidth: '140px' }}>
+                    {t.motivo.split('|')[0]}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: '11px', color: c.texto2, marginTop: '10px' }}>
+              ⚠️ Aposte apenas quando probabilidade ≥ 65% E confiança ≥ 70%. Nunca aposte em sequências longas sem confirmar com o histórico.
+            </div>
+          </div>
+        )
+      })()}
 
       {/* GRADE */}
       <div style={{ overflowX: 'auto' }}>
