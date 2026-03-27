@@ -45,6 +45,7 @@ interface Tendencia {
   direcao: 'GREEN' | 'RED'
   motivo: string
   confianca: number
+  mercado: string
 }
 
 function extrairPlacarRaw(val: string | null): PlacarInfo | null {
@@ -94,11 +95,20 @@ function calcularTendencias(linhas: Partida[], colunas: string[], tipoIA: number
     if (validos.length < 5) return
 
     const minuto = col.replace('tempo', '')
-    const pctOver = Math.round((validos.filter(p => p.over25).length / validos.length) * 100)
+
+    // Calcular % por mercado
+    const pctOver05 = Math.round((validos.filter(p => p.over05).length / validos.length) * 100)
+    const pctOver15 = Math.round((validos.filter(p => p.over15).length / validos.length) * 100)
+    const pctOver25 = Math.round((validos.filter(p => p.over25).length / validos.length) * 100)
+    const pctOver35 = Math.round((validos.filter(p => p.over35).length / validos.length) * 100)
+    const pctUnder25 = 100 - pctOver25
     const pctAmbas = Math.round((validos.filter(p => p.ambasSim).length / validos.length) * 100)
+    const pctCasa = Math.round((validos.filter(p => p.casaVence).length / validos.length) * 100)
+    const pctEmpate = Math.round((validos.filter(p => p.empate).length / validos.length) * 100)
+    const pctFora = Math.round((validos.filter(p => p.foraVence).length / validos.length) * 100)
     const mediaGols = Math.round((validos.reduce((s, p) => s + p.gols, 0) / validos.length) * 10) / 10
 
-    // Sequência atual
+    // Sequência atual (over25)
     let seqAtual = 0
     let dirAtual: boolean | null = null
     for (const p of historico) {
@@ -108,40 +118,17 @@ function calcularTendencias(linhas: Partida[], colunas: string[], tipoIA: number
       else break
     }
 
-    let prob = pctOver
-    let motivo = ''
-    let confianca = 55
+    // Montar lista de mercados com probabilidade ajustada
+    const mercados: { nome: string; prob: number; boost: number }[] = []
 
+    // Ajuste base por tipo de IA
+    let boost = 0
     if (tipoIA === 1) {
-      // Tipo 1: Sequência simples 2h
-      if (seqAtual >= 3 && dirAtual === false) {
-        prob = Math.min(pctOver + seqAtual * 8, 92)
-        motivo = `${seqAtual}x RED seguidos → correção esperada`
-        confianca = Math.min(70 + seqAtual * 5, 92)
-      } else if (seqAtual >= 3 && dirAtual === true) {
-        prob = Math.max(pctOver - seqAtual * 6, 18)
-        motivo = `${seqAtual}x GREEN seguidos → possível reversão`
-        confianca = Math.min(65 + seqAtual * 4, 88)
-      } else {
-        motivo = `${pctOver}% histórico | Seq: ${seqAtual}`
-        confianca = Math.abs(pctOver - 50) > 15 ? 70 : 50
-      }
-
+      boost = seqAtual >= 3 && dirAtual === false ? seqAtual * 8 : 0
     } else if (tipoIA === 2) {
-      // Tipo 2: Correlação hora anterior
-      const ultimaHora = historico[0]
-      const penultimaHora = historico[1]
-      let ajuste = 0
-      if (ultimaHora && !ultimaHora.over25) ajuste += 10
-      if (penultimaHora && !penultimaHora.over25) ajuste += 8
-      if (pctAmbas > 60) ajuste += 5
-      if (mediaGols > 2.5) ajuste += 5
-      prob = Math.min(pctOver + ajuste, 93)
-      motivo = `Hist:${pctOver}% | Últ.hora:${ultimaHora ? (ultimaHora.over25 ? 'G' : 'R') : '?'} | Gols:${mediaGols}`
-      confianca = Math.abs(prob - 50) > 20 ? 78 : 58
-
+      const ult = historico[0]
+      boost = ult && !ult.over25 ? 15 : 0
     } else {
-      // Tipo 3: Análise avançada — ciclos + padrões compostos
       let cicloCount = 0
       let ant = historico[0]?.over25
       for (let i = 1; i < Math.min(historico.length, 24); i++) {
@@ -150,31 +137,43 @@ function calcularTendencias(linhas: Partida[], colunas: string[], tipoIA: number
         if (p.over25 !== ant) { cicloCount++; ant = p.over25 }
       }
       const cicloMedio = cicloCount > 0 ? Math.round(24 / cicloCount) : 0
-
-      // Ajuste por ciclo
-      if (cicloMedio > 0 && seqAtual >= cicloMedio) {
-        const fatorCiclo = Math.min((seqAtual - cicloMedio + 1) * 12, 30)
-        prob = dirAtual ? Math.max(pctOver - fatorCiclo, 15) : Math.min(pctOver + fatorCiclo, 93)
-        confianca = Math.min(75 + (seqAtual - cicloMedio) * 5, 93)
-      }
-
-      // Boost por ambas marcam e média gols
-      if (pctAmbas > 65) prob = Math.min(prob + 8, 93)
-      if (mediaGols > 3.0) prob = Math.min(prob + 6, 93)
-      if (mediaGols < 1.5) prob = Math.max(prob - 8, 15)
-
-      prob = Math.round(prob)
-      motivo = `Ciclo≈${cicloMedio} | Seq:${seqAtual} | ${mediaGols}g/p | Ambas:${pctAmbas}%`
-      confianca = seqAtual >= 4 ? Math.min(80 + seqAtual * 2, 93) : Math.abs(prob - 50) > 20 ? 72 : 55
+      boost = cicloMedio > 0 && seqAtual >= cicloMedio ? Math.min((seqAtual - cicloMedio + 1) * 12, 30) : 0
     }
+
+    mercados.push({ nome: 'OVER 0.5', prob: Math.min(pctOver05, 98), boost: 0 })
+    mercados.push({ nome: 'OVER 1.5', prob: Math.min(pctOver15, 95), boost: 0 })
+    mercados.push({ nome: 'OVER 2.5', prob: Math.min(pctOver25 + (dirAtual === false ? boost : 0), 93), boost })
+    mercados.push({ nome: 'UNDER 2.5', prob: Math.min(pctUnder25 + (dirAtual === true ? boost : 0), 93), boost: dirAtual === true ? boost : 0 })
+    mercados.push({ nome: 'OVER 3.5', prob: Math.min(pctOver35, 90), boost: 0 })
+    mercados.push({ nome: 'AMBAS SIM', prob: Math.min(pctAmbas + (pctAmbas > 55 ? boost / 2 : 0), 92), boost: 0 })
+    mercados.push({ nome: 'CASA', prob: pctCasa, boost: 0 })
+    mercados.push({ nome: 'EMPATE', prob: pctEmpate, boost: 0 })
+    mercados.push({ nome: 'FORA', prob: pctFora, boost: 0 })
+
+    // Melhor mercado (excluindo óbvios como over05)
+    const melhor = mercados
+      .filter(m => m.nome !== 'OVER 0.5')
+      .sort((a, b) => b.prob - a.prob)[0]
+
+    const prob = Math.round(melhor.prob)
+    const confianca = melhor.boost > 0
+      ? Math.min(75 + melhor.boost, 93)
+      : Math.abs(prob - 50) > 20 ? 72 : 55
+
+    const motivo = tipoIA === 1
+      ? `${seqAtual}x ${dirAtual ? 'GREEN' : 'RED'} | Hist: ${pctOver25}% | Gols: ${mediaGols}`
+      : tipoIA === 2
+      ? `Últ: ${historico[0]?.over25 ? 'G' : 'R'} | Gols: ${mediaGols} | Ambas: ${pctAmbas}%`
+      : `Seq:${seqAtual} | ${mediaGols}g/p | Ambas:${pctAmbas}%`
 
     tendencias.push({
       minuto,
-      probabilidade: Math.round(prob),
+      probabilidade: prob,
       sequencia: seqAtual,
       direcao: prob >= 50 ? 'GREEN' : 'RED',
       motivo,
       confianca,
+      mercado: melhor.nome,
     })
   })
 
@@ -333,9 +332,10 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {melhores.map((t, i) => (
-                <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '120px' }}>
-                  <div style={{ fontSize: '11px', color: c.texto2, marginBottom: '4px', letterSpacing: '1px' }}>MIN {t.minuto}</div>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#2979ff', fontFamily: 'monospace', lineHeight: 1 }}>
+                <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '130px' }}>
+                  <div style={{ fontSize: '11px', color: c.texto2, marginBottom: '2px', letterSpacing: '1px' }}>MIN {t.minuto}</div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#ffd600', marginBottom: '4px', letterSpacing: '1px' }}>{t.mercado}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#2979ff', fontFamily: 'monospace', lineHeight: 1 }}>
                     {t.probabilidade}%
                   </div>
                   <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>
@@ -380,8 +380,9 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
                     <td key={col} title={t?.motivo} style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '3px 2px', textAlign: 'center' }}>
                       {t ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 800, color: '#2979ff' }}>{t.probabilidade}%</span>
-                          <span style={{ fontSize: '9px', color: c.verdeClaro }}>{t.confianca}%</span>
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#2979ff' }}>{t.probabilidade}%</span>
+                          <span style={{ fontSize: '8px', color: c.verdeClaro }}>{t.confianca}%</span>
+                          <span style={{ fontSize: '8px', color: '#ffd600', letterSpacing: '0.3px', textAlign: 'center', maxWidth: '48px', lineHeight: '1.1' }}>{t.mercado}</span>
                         </div>
                       ) : <span style={{ color: c.borda }}>—</span>}
                     </td>
