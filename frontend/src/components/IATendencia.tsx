@@ -218,9 +218,9 @@ function BarraProgresso({ pct, cor }: { pct: number; cor: string }) {
 }
 
 const COR_CONFIANCA = {
-  ALTA: '#00ff88',
-  MEDIA: '#f5c518',
-  BAIXA: '#e8334a',
+  ALTA: '#00c853',
+  MEDIA: '#b8960c',
+  BAIXA: '#8b1a1a',
 }
 
 export default function IATendencia({ linhas, colunas }: Props) {
@@ -255,19 +255,19 @@ export default function IATendencia({ linhas, colunas }: Props) {
             IA TENDÊNCIA
           </div>
           <div style={{ fontSize: '13px', color: '#e0e0f0' }}>
-            Análise das últimas 24h · <span style={{ color: '#00ff88' }}>{analise.totalPartidas} partidas</span>
+            Análise das últimas 24h · <span style={{ color: '#00c853' }}>{analise.totalPartidas} partidas</span>
           </div>
         </div>
         {analise.sequenciaAtual && (
           <div style={{
             background: analise.sequenciaAtual === 'OVER' ? '#e8334a22' : '#1a6fff22',
-            border: `1px solid ${analise.sequenciaAtual === 'OVER' ? '#e8334a' : '#1a6fff'}`,
+            border: `1px solid ${analise.sequenciaAtual === 'OVER' ? '#8b1a1a' : '#1a6fff'}`,
             borderRadius: '6px', padding: '8px 14px', textAlign: 'center',
           }}>
             <div style={{ fontSize: '11px', color: '#8888aa', marginBottom: '2px' }}>SEQUÊNCIA ATUAL</div>
             <div style={{
               fontSize: '20px', fontWeight: 'bold',
-              color: analise.sequenciaAtual === 'OVER' ? '#e8334a' : '#1a6fff',
+              color: analise.sequenciaAtual === 'OVER' ? '#8b1a1a' : '#1a6fff',
             }}>
               {analise.sequenciaTamanho}x {analise.sequenciaAtual}
             </div>
@@ -303,14 +303,14 @@ export default function IATendencia({ linhas, colunas }: Props) {
                   </div>
                   <span style={{
                     fontSize: '18px', fontWeight: 'bold',
-                    color: p.probabilidade >= 60 ? '#00ff88' : p.probabilidade >= 45 ? '#f5c518' : '#8888aa',
+                    color: p.probabilidade >= 60 ? '#00c853' : p.probabilidade >= 45 ? '#b8960c' : '#8888aa',
                   }}>
                     {p.probabilidade}%
                   </span>
                 </div>
                 <BarraProgresso
                   pct={p.probabilidade}
-                  cor={p.probabilidade >= 60 ? '#00ff88' : p.probabilidade >= 45 ? '#f5c518' : '#e8334a'}
+                  cor={p.probabilidade >= 60 ? '#00c853' : p.probabilidade >= 45 ? '#b8960c' : '#8b1a1a'}
                 />
                 <div style={{ fontSize: '11px', color: '#8888aa', marginTop: '3px' }}>
                   {p.motivo}
@@ -331,13 +331,13 @@ export default function IATendencia({ linhas, colunas }: Props) {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {[
-                { label: 'Over 0.5', pct: analise.over05, cor: '#00ff88' },
+                { label: 'Over 0.5', pct: analise.over05, cor: '#00c853' },
                 { label: 'Under 1.5', pct: analise.under15, cor: '#1a6fff' },
-                { label: 'Over 1.5', pct: analise.over15, cor: '#00ff88' },
+                { label: 'Over 1.5', pct: analise.over15, cor: '#00c853' },
                 { label: 'Under 2.5', pct: analise.under25, cor: '#1a6fff' },
-                { label: 'Over 2.5', pct: analise.over25, cor: '#00ff88' },
+                { label: 'Over 2.5', pct: analise.over25, cor: '#00c853' },
                 { label: 'Under 3.5', pct: analise.under35, cor: '#1a6fff' },
-                { label: 'Over 3.5', pct: analise.over35, cor: '#00ff88' },
+                { label: 'Over 3.5', pct: analise.over35, cor: '#00c853' },
               ].map(item => (
                 <div key={item.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' }}>
@@ -360,10 +360,10 @@ export default function IATendencia({ linhas, colunas }: Props) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
-                { label: 'Casa', pct: analise.casa, cor: '#00ff88' },
-                { label: 'Empate', pct: analise.empate, cor: '#f5c518' },
+                { label: 'Casa', pct: analise.casa, cor: '#00c853' },
+                { label: 'Empate', pct: analise.empate, cor: '#b8960c' },
                 { label: 'Fora', pct: analise.fora, cor: '#1a6fff' },
-                { label: 'Ambas Sim', pct: analise.ambasSim, cor: '#e8334a' },
+                { label: 'Ambas Sim', pct: analise.ambasSim, cor: '#8b1a1a' },
                 { label: 'Ambas Não', pct: analise.ambasNao, cor: '#8888aa' },
               ].map(item => (
                 <div key={item.label}>
@@ -390,7 +390,7 @@ export default function IATendencia({ linhas, colunas }: Props) {
             {analise.placaresMaisFrequentes.map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{
-                  background: '#e8334a', color: '#fff',
+                  background: '#8b1a1a', color: '#fff',
                   padding: '4px 10px', borderRadius: '4px',
                   fontWeight: 'bold', fontSize: '14px',
                   minWidth: '50px', textAlign: 'center',
@@ -400,7 +400,7 @@ export default function IATendencia({ linhas, colunas }: Props) {
                 <div style={{ flex: 1 }}>
                   <BarraProgresso
                     pct={Math.round((p.count / analise.totalPartidas) * 100)}
-                    cor='#e8334a'
+                    cor='#8b1a1a'
                   />
                 </div>
                 <span style={{ fontSize: '12px', color: '#8888aa', minWidth: '30px', textAlign: 'right' }}>
@@ -416,7 +416,7 @@ export default function IATendencia({ linhas, colunas }: Props) {
             <div style={{ fontSize: '11px', color: '#8888aa', letterSpacing: '1px', marginBottom: '4px' }}>
               MÉDIA DE GOLS
             </div>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f5c518' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#b8960c' }}>
               {analise.mediagols}
             </div>
             <div style={{ fontSize: '11px', color: '#8888aa' }}>por partida nas últimas 24h</div>
