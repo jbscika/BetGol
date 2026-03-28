@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Partida } from '../pages/Dashboard'
 
 interface Props {
@@ -8,179 +8,148 @@ interface Props {
 }
 
 interface PlacarInfo {
-  casa: number
-  fora: number
-  texto: string
-  gols: number
-  over05: boolean
-  over15: boolean
-  over25: boolean
-  over35: boolean
-  ambasSim: boolean
-  casaVence: boolean
-  empate: boolean
-  foraVence: boolean
-}
-
-interface ColStats {
-  col: string
-  total: number
-  greens: number
-  pctGreen: number
-  mediaGols: number
-}
-
-interface LinhaStats {
-  idx: number
-  total: number
-  greens: number
-  pctGreen: number
-  totalGols: number
+  casa: number; fora: number; texto: string; gols: number
+  over05: boolean; over15: boolean; over25: boolean; over35: boolean
+  ambasSim: boolean; casaVence: boolean; empate: boolean; foraVence: boolean
 }
 
 interface Tendencia {
   minuto: string
-  probabilidade: number
-  sequencia: number
-  direcao: 'GREEN' | 'RED'
-  motivo: string
-  confianca: number
   mercado: string
+  probabilidade: number
+  confianca: number
+  motivo: string
 }
 
-function extrairPlacarRaw(val: string | null): PlacarInfo | null {
+const FILTRO_VAZIO = { over: '', under: '', ambas: '', resultado: '' }
+
+function extrairPlacar(val: string | null): PlacarInfo | null {
   if (!val) return null
   const linha = val.split('</br>')[0].split('<br>')[0].trim()
   const m = linha.match(/(\d+)\s*-\s*(\d+)/)
   if (!m) return null
-  const casa = parseInt(m[1])
-  const fora = parseInt(m[2])
-  const gols = casa + fora
+  const casa = parseInt(m[1]), fora = parseInt(m[2]), gols = casa + fora
   return {
-    casa, fora, gols,
-    texto: `${casa}-${fora}`,
-    over05: gols > 0.5,
-    over15: gols > 1.5,
-    over25: gols > 2.5,
-    over35: gols > 3.5,
+    casa, fora, gols, texto: `${casa}-${fora}`,
+    over05: gols > 0.5, over15: gols > 1.5, over25: gols > 2.5, over35: gols > 3.5,
     ambasSim: casa > 0 && fora > 0,
-    casaVence: casa > fora,
-    empate: casa === fora,
-    foraVence: fora > casa,
+    casaVence: casa > fora, empate: casa === fora, foraVence: fora > casa,
   }
 }
 
-function verificarFiltro(p: PlacarInfo, filtros: any): boolean {
-  if (filtros.over && p.gols <= parseFloat(filtros.over)) return false
-  if (filtros.under && p.gols >= parseFloat(filtros.under)) return false
-  if (filtros.ambas === 'sim' && !p.ambasSim) return false
-  if (filtros.ambas === 'nao' && p.ambasSim) return false
-  if (filtros.resultado === 'casa' && !p.casaVence) return false
-  if (filtros.resultado === 'empate' && !p.empate) return false
-  if (filtros.resultado === 'fora' && !p.foraVence) return false
+function passaFiltro(p: PlacarInfo, f: typeof FILTRO_VAZIO): boolean {
+  if (f.over && p.gols <= parseFloat(f.over)) return false
+  if (f.under && p.gols >= parseFloat(f.under)) return false
+  if (f.ambas === 'sim' && !p.ambasSim) return false
+  if (f.ambas === 'nao' && p.ambasSim) return false
+  if (f.resultado === 'casa' && !p.casaVence) return false
+  if (f.resultado === 'empate' && !p.empate) return false
+  if (f.resultado === 'fora' && !p.foraVence) return false
   return true
 }
 
-function calcularTendencias(linhas: Partida[], colunas: string[], tipoIA: number): Tendencia[] {
-  const tendencias: Tendencia[] = []
+function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtroAtivo: typeof FILTRO_VAZIO): Tendencia[] {
   const horas = Math.min(linhas.length, 48)
+  const resultado: Tendencia[] = []
+  const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
 
   colunas.forEach(col => {
-    const historico: (PlacarInfo | null)[] = []
-    for (let i = 0; i < horas; i++) {
-      historico.push(extrairPlacarRaw(linhas[i]?.[col] as string))
-    }
-
-    const validos = historico.filter(p => p !== null) as PlacarInfo[]
+    const hist: (PlacarInfo | null)[] = []
+    for (let i = 0; i < horas; i++) hist.push(extrairPlacar(linhas[i]?.[col] as string))
+    const validos = hist.filter(Boolean) as PlacarInfo[]
     if (validos.length < 5) return
 
-    const minuto = col.replace('tempo', '')
+    const min = col.replace('tempo', '')
+    const n = validos.length
 
-    // Calcular % por mercado
-    const pctOver05 = Math.round((validos.filter(p => p.over05).length / validos.length) * 100)
-    const pctOver15 = Math.round((validos.filter(p => p.over15).length / validos.length) * 100)
-    const pctOver25 = Math.round((validos.filter(p => p.over25).length / validos.length) * 100)
-    const pctOver35 = Math.round((validos.filter(p => p.over35).length / validos.length) * 100)
-    const pctUnder25 = 100 - pctOver25
-    const pctAmbas = Math.round((validos.filter(p => p.ambasSim).length / validos.length) * 100)
-    const pctCasa = Math.round((validos.filter(p => p.casaVence).length / validos.length) * 100)
-    const pctEmpate = Math.round((validos.filter(p => p.empate).length / validos.length) * 100)
-    const pctFora = Math.round((validos.filter(p => p.foraVence).length / validos.length) * 100)
-    const mediaGols = Math.round((validos.reduce((s, p) => s + p.gols, 0) / validos.length) * 10) / 10
+    // % por mercado
+    const pO05 = Math.round(validos.filter(p => p.over05).length / n * 100)
+    const pO15 = Math.round(validos.filter(p => p.over15).length / n * 100)
+    const pO25 = Math.round(validos.filter(p => p.over25).length / n * 100)
+    const pO35 = Math.round(validos.filter(p => p.over35).length / n * 100)
+    const pU25 = 100 - pO25
+    const pAmbas = Math.round(validos.filter(p => p.ambasSim).length / n * 100)
+    const pCasa = Math.round(validos.filter(p => p.casaVence).length / n * 100)
+    const pEmp = Math.round(validos.filter(p => p.empate).length / n * 100)
+    const pFora = Math.round(validos.filter(p => p.foraVence).length / n * 100)
+    const mediaG = Math.round(validos.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
 
-    // Sequência atual (over25)
-    let seqAtual = 0
-    let dirAtual: boolean | null = null
-    for (const p of historico) {
+    // Sequência atual over25
+    let seq = 0; let dir: boolean | null = null
+    for (const p of hist) {
       if (!p) continue
-      if (dirAtual === null) { dirAtual = p.over25; seqAtual = 1 }
-      else if (p.over25 === dirAtual) seqAtual++
+      if (dir === null) { dir = p.over25; seq = 1 }
+      else if (p.over25 === dir) seq++
       else break
     }
 
-    // Montar lista de mercados com probabilidade ajustada
-    const mercados: { nome: string; prob: number; boost: number }[] = []
-
-    // Ajuste base por tipo de IA
+    // Boost por tipo de IA
     let boost = 0
-    if (tipoIA === 1) {
-      boost = seqAtual >= 3 && dirAtual === false ? seqAtual * 8 : 0
-    } else if (tipoIA === 2) {
-      const ult = historico[0]
-      boost = ult && !ult.over25 ? 15 : 0
-    } else {
-      let cicloCount = 0
-      let ant = historico[0]?.over25
-      for (let i = 1; i < Math.min(historico.length, 24); i++) {
-        const p = historico[i]
-        if (!p) continue
-        if (p.over25 !== ant) { cicloCount++; ant = p.over25 }
+    if (tipoIA === 1) boost = seq >= 3 && dir === false ? seq * 8 : 0
+    else if (tipoIA === 2) boost = hist[0] && !hist[0]!.over25 ? 15 : 0
+    else {
+      let cc = 0; let ant = hist[0]?.over25
+      for (let i = 1; i < Math.min(hist.length, 24); i++) {
+        const p = hist[i]; if (!p) continue
+        if (p.over25 !== ant) { cc++; ant = p.over25 }
       }
-      const cicloMedio = cicloCount > 0 ? Math.round(24 / cicloCount) : 0
-      boost = cicloMedio > 0 && seqAtual >= cicloMedio ? Math.min((seqAtual - cicloMedio + 1) * 12, 30) : 0
+      const cm = cc > 0 ? Math.round(24 / cc) : 0
+      boost = cm > 0 && seq >= cm ? Math.min((seq - cm + 1) * 12, 30) : 0
     }
 
-    mercados.push({ nome: 'OVER 0.5', prob: Math.min(pctOver05, 98), boost: 0 })
-    mercados.push({ nome: 'OVER 1.5', prob: Math.min(pctOver15, 95), boost: 0 })
-    mercados.push({ nome: 'OVER 2.5', prob: Math.min(pctOver25 + (dirAtual === false ? boost : 0), 93), boost })
-    mercados.push({ nome: 'UNDER 2.5', prob: Math.min(pctUnder25 + (dirAtual === true ? boost : 0), 93), boost: dirAtual === true ? boost : 0 })
-    mercados.push({ nome: 'OVER 3.5', prob: Math.min(pctOver35, 90), boost: 0 })
-    mercados.push({ nome: 'AMBAS SIM', prob: Math.min(pctAmbas + (pctAmbas > 55 ? boost / 2 : 0), 92), boost: 0 })
-    mercados.push({ nome: 'CASA', prob: pctCasa, boost: 0 })
-    mercados.push({ nome: 'EMPATE', prob: pctEmpate, boost: 0 })
-    mercados.push({ nome: 'FORA', prob: pctFora, boost: 0 })
+    // Se tem filtro ativo, calcular prob para esse mercado específico
+    let mercadoNome = ''
+    let probFinal = 0
+    let confiancaFinal = 55
 
-    // Melhor mercado (excluindo óbvios como over05)
-    const melhor = mercados
-      .filter(m => m.nome !== 'OVER 0.5')
-      .sort((a, b) => b.prob - a.prob)[0]
+    if (temFiltro) {
+      // Calcular % histórica para o filtro selecionado
+      const greens = validos.filter(p => passaFiltro(p, filtroAtivo)).length
+      const pctFiltro = Math.round(greens / n * 100)
 
-    const prob = Math.round(melhor.prob)
-    const confianca = melhor.boost > 0
-      ? Math.min(75 + melhor.boost, 93)
-      : Math.abs(prob - 50) > 20 ? 72 : 55
+      // Montar nome do mercado
+      const partes = []
+      if (filtroAtivo.over) partes.push(`OVER ${filtroAtivo.over}`)
+      if (filtroAtivo.under) partes.push(`UNDER ${filtroAtivo.under}`)
+      if (filtroAtivo.ambas === 'sim') partes.push('AMBAS SIM')
+      if (filtroAtivo.ambas === 'nao') partes.push('AMBAS NÃO')
+      if (filtroAtivo.resultado) partes.push(filtroAtivo.resultado.toUpperCase())
+      mercadoNome = partes.join(' + ')
 
-    const motivo = tipoIA === 1
-      ? `${seqAtual}x ${dirAtual ? 'GREEN' : 'RED'} | Hist: ${pctOver25}% | Gols: ${mediaGols}`
-      : tipoIA === 2
-      ? `Últ: ${historico[0]?.over25 ? 'G' : 'R'} | Gols: ${mediaGols} | Ambas: ${pctAmbas}%`
-      : `Seq:${seqAtual} | ${mediaGols}g/p | Ambas:${pctAmbas}%`
+      probFinal = Math.min(pctFiltro + (dir === false ? boost : 0), 93)
+      confiancaFinal = boost > 0 ? Math.min(75 + boost, 93) : Math.abs(probFinal - 50) > 20 ? 72 : 55
+    } else {
+      // Sem filtro: encontrar melhor mercado automaticamente
+      const opcoes = [
+        { nome: 'OVER 1.5', prob: pO15 },
+        { nome: 'OVER 2.5', prob: Math.min(pO25 + (dir === false ? boost : 0), 93) },
+        { nome: 'UNDER 2.5', prob: Math.min(pU25 + (dir === true ? boost : 0), 93) },
+        { nome: 'OVER 3.5', prob: pO35 },
+        { nome: 'AMBAS SIM', prob: Math.min(pAmbas + (pAmbas > 55 ? Math.round(boost / 2) : 0), 92) },
+        { nome: 'CASA', prob: pCasa },
+        { nome: 'EMPATE', prob: pEmp },
+        { nome: 'FORA', prob: pFora },
+      ].sort((a, b) => b.prob - a.prob)
 
-    tendencias.push({
-      minuto,
-      probabilidade: prob,
-      sequencia: seqAtual,
-      direcao: prob >= 50 ? 'GREEN' : 'RED',
+      const melhor = opcoes[0]
+      mercadoNome = melhor.nome
+      probFinal = Math.round(melhor.prob)
+      confiancaFinal = boost > 0 ? Math.min(75 + boost, 93) : Math.abs(probFinal - 50) > 20 ? 72 : 55
+    }
+
+    const motivo = `Seq:${seq} | Gols:${mediaG} | Ambas:${pAmbas}%`
+
+    resultado.push({
+      minuto: min,
+      mercado: mercadoNome,
+      probabilidade: Math.round(probFinal),
+      confianca: confiancaFinal,
       motivo,
-      confianca,
-      mercado: melhor.nome,
     })
   })
 
-  return tendencias
+  return resultado
 }
-
-const FILTRO_VAZIO = { over: '', under: '', ambas: '', resultado: '' }
 
 export default function GradeResultados({ linhas, colunas, liga }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
@@ -189,71 +158,67 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
   const [mostrarIA, setMostrarIA] = useState(true)
 
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
-  const colsUsadas = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+  const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
 
-  const colStats = useMemo((): ColStats[] => {
-    return colsUsadas.map(col => {
-      let total = 0, greens = 0, totalGols = 0
-      linhas.forEach(linha => {
-        const p = extrairPlacarRaw(linha[col] as string)
-        if (p) {
-          total++
-          totalGols += p.gols
-          const pass = !temFiltro || verificarFiltro(p, filtrosAtivos)
-          if (pass && p.over25) greens++
-        }
-      })
-      return { col, total, greens, pctGreen: total > 0 ? Math.round((greens / total) * 100) : 0, mediaGols: total > 0 ? Math.round((totalGols / total) * 10) / 10 : 0 }
+  // Stats por coluna
+  const colStats = useMemo(() => cols.map(col => {
+    let total = 0, greens = 0, totalGols = 0
+    linhas.forEach(linha => {
+      const p = extrairPlacar(linha[col] as string)
+      if (p) { total++; totalGols += p.gols; if (!temFiltro || passaFiltro(p, filtrosAtivos)) if (p.over25) greens++ }
     })
-  }, [linhas, colunas, filtrosAtivos])
+    return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
+  }), [linhas, colunas, filtrosAtivos])
 
-  const linhaStats = useMemo((): LinhaStats[] => {
-    return linhas.map((linha, idx) => {
-      let total = 0, greens = 0, totalGols = 0
-      colsUsadas.forEach(col => {
-        const p = extrairPlacarRaw(linha[col] as string)
-        if (p) {
-          total++
-          totalGols += p.gols
-          if (p.over25) greens++
-        }
-      })
-      return { idx, total, greens, pctGreen: total > 0 ? Math.round((greens / total) * 100) : 0, totalGols }
+  // Stats por linha
+  const linhaStats = useMemo(() => linhas.map((linha, idx) => {
+    let total = 0, greens = 0, totalGols = 0
+    cols.forEach(col => {
+      const p = extrairPlacar(linha[col] as string)
+      if (p) { total++; totalGols += p.gols; if (p.over25) greens++ }
     })
-  }, [linhas, colunas])
+    return { idx, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
+  }), [linhas, colunas])
 
+  // IA Tendência — recalcula quando linhas, colunas, tipoIA ou filtro mudam
   const tendencias = useMemo(() => {
     if (!mostrarIA || linhas.length < 5) return []
-    return calcularTendencias(linhas, colsUsadas, tipoIA)
-  }, [linhas, colunas, tipoIA, mostrarIA])
+    return calcularIA(linhas, cols, tipoIA, filtrosAtivos)
+  }, [linhas, colunas, tipoIA, mostrarIA, filtrosAtivos])
 
-  const totalPartidas = linhaStats.reduce((s, l) => s + l.total, 0)
-  const totalGreens = linhaStats.reduce((s, l) => s + l.greens, 0)
-  const pctGeral = totalPartidas > 0 ? Math.round((totalGreens / totalPartidas) * 100) : 0
-  const mediaGolsGeral = totalPartidas > 0 ? Math.round((linhaStats.reduce((s, l) => s + l.totalGols, 0) / totalPartidas) * 10) / 10 : 0
+  const totalP = linhaStats.reduce((s, l) => s + l.total, 0)
+  const totalG = linhaStats.reduce((s, l) => s + l.greens, 0)
+  const pctGeral = totalP > 0 ? Math.round(totalG / totalP * 100) : 0
+  const mediaGols = totalP > 0 ? Math.round(linhaStats.reduce((s, l) => s + l.totalGols, 0) / totalP * 10) / 10 : 0
 
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
 
   const c = {
-    bg: '#080c0e', bg2: '#0d1214', bg3: '#131a1d', bg4: '#1a2328',
-    borda: '#1e2d33', verde: '#1a4a2e', vermelho: '#6b0f0f',
-    verdeClaro: '#00c853', vermelhoClaro: '#e53935',
-    texto: '#cfd8dc', texto2: '#607d8b', amarelo: '#b8960c', azul: '#1565c0',
+    bg2: '#0d1214', bg3: '#131a1d', bg4: '#1a2328', borda: '#1e2d33',
+    verde: '#1a4a2e', vermelho: '#7a1010',
+    verdeClaro: '#00c853', vermelhoClaro: '#f44336',
+    texto: '#cfd8dc', texto2: '#607d8b', amarelo: '#ffd600', azul: '#2979ff',
   }
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
 
+  // Melhores entradas
+  const melhores = tendencias
+    .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
+    .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
+    .slice(0, 5)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-      {/* STATS HEADER */}
+      {/* STATS */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           {[
             { lbl: 'MEDIA GREENS', val: `${pctGeral}%`, cor: c.verdeClaro },
-            { lbl: 'MÉDIA GOLS', val: String(mediaGolsGeral), cor: c.amarelo },
-            { lbl: 'PARTIDAS', val: String(totalPartidas), cor: c.texto },
+            { lbl: 'MÉDIA GOLS', val: String(mediaGols), cor: c.amarelo },
+            { lbl: 'PARTIDAS', val: String(totalP), cor: c.texto },
           ].map(s => (
             <div key={s.lbl} style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '8px 14px' }}>
               <div style={{ fontSize: '10px', color: c.texto2, letterSpacing: '2px' }}>{s.lbl}</div>
@@ -262,7 +227,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', letterSpacing: '1px', background: mostrarIA ? c.verdeClaro : c.bg4, color: mostrarIA ? '#000' : c.texto2 }}>
+          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: mostrarIA ? c.verdeClaro : c.bg4, color: mostrarIA ? '#000' : c.texto2 }}>
             IA {mostrarIA ? 'ON' : 'OFF'}
           </button>
           {mostrarIA && ([1,2,3] as const).map(t => (
@@ -281,14 +246,14 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
             <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>OVER</span>
             <select style={sel} value={filtros.over} onChange={e => setFiltros(p => ({ ...p, over: e.target.value }))}>
               <option value="">—</option>
-              {['0.5','1.5','2.5','3.5'].map(o => <option key={o}>{o}</option>)}
+              {['0.5','1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>UNDER</span>
             <select style={sel} value={filtros.under} onChange={e => setFiltros(p => ({ ...p, under: e.target.value }))}>
               <option value="">—</option>
-              {['1.5','2.5','3.5'].map(o => <option key={o}>{o}</option>)}
+              {['1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -313,46 +278,29 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
         </div>
       </div>
 
-      {/* PAINEL APOSTAR AGORA */}
-      {mostrarIA && tendencias.length > 0 && (() => {
-        const melhores = tendencias
-          .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
-          .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
-          .slice(0, 5)
-        if (melhores.length === 0) return null
-        return (
-          <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '14px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: c.verdeClaro, animation: 'pulse 1.5s infinite' }} />
-              <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>
-                MELHORES ENTRADAS — PRÓXIMA PARTIDA
-              </span>
-              <span style={{ fontSize: '11px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
-              {liga && <span style={{ fontSize: '11px', background: '#1565c022', color: '#2979ff', border: '1px solid #1565c044', borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-              {melhores.map((t, i) => (
-                <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '130px' }}>
-                  <div style={{ fontSize: '11px', color: c.texto2, marginBottom: '2px', letterSpacing: '1px' }}>MIN {t.minuto}</div>
-                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#ffd600', marginBottom: '4px', letterSpacing: '1px' }}>{t.mercado}</div>
-                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#2979ff', fontFamily: 'monospace', lineHeight: 1 }}>
-                    {t.probabilidade}%
-                  </div>
-                  <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>
-                    Confiança: {t.confianca}%
-                  </div>
-                  <div style={{ fontSize: '10px', color: c.texto2, marginTop: '3px', maxWidth: '140px' }}>
-                    {t.motivo.split('|')[0]}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: '11px', color: c.texto2, marginTop: '10px' }}>
-              ⚠️ Aposte apenas quando probabilidade ≥ 65% E confiança ≥ 70%. Nunca aposte em sequências longas sem confirmar com o histórico.
-            </div>
+      {/* MELHORES ENTRADAS */}
+      {mostrarIA && melhores.length > 0 && (
+        <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.verdeClaro }} />
+            <span style={{ fontSize: '12px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
+            <span style={{ fontSize: '11px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
+            {liga && <span style={{ fontSize: '11px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
           </div>
-        )
-      })()}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {melhores.map((t, i) => (
+              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '130px' }}>
+                <div style={{ fontSize: '10px', color: c.texto2, marginBottom: '2px' }}>MIN {t.minuto}</div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: c.amarelo, marginBottom: '4px' }}>{t.mercado}</div>
+                <div style={{ fontSize: '22px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>Conf: {t.confianca}%</div>
+                <div style={{ fontSize: '10px', color: c.texto2, marginTop: '3px' }}>{t.motivo.split('|')[0]}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '11px', color: c.texto2, marginTop: '10px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
+        </div>
+      )}
 
       {/* GRADE */}
       <div style={{ overflowX: 'auto' }}>
@@ -362,28 +310,29 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
             <tr>
               <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '5px 8px', color: c.verdeClaro, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, minWidth: '44px' }}>HORA</th>
               {colStats.map(cs => (
-                <th key={cs.col} style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '4px 5px', textAlign: 'center', minWidth: '50px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: cs.pctGreen >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{cs.pctGreen}%</div>
+                <th key={cs.col} style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '4px 5px', textAlign: 'center', minWidth: '52px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{cs.pct}%</div>
                   <div style={{ fontSize: '10px', color: c.texto2 }}>{cs.total}</div>
                 </th>
               ))}
               <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '4px 8px', color: c.texto2, fontSize: '10px', minWidth: '72px', textAlign: 'center' }}>% | GOLS</th>
             </tr>
 
-            {/* IA Tendência */}
+            {/* IA Tendência — só mostra prob/conf quando filtro ativo */}
             {mostrarIA && (
               <tr>
                 <th style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '4px 8px', color: c.azul, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3 }}>IA T{tipoIA}</th>
-                {colsUsadas.map(col => {
+                {cols.map(col => {
                   const t = tendencias.find(t => t.minuto === col.replace('tempo', ''))
                   return (
                     <td key={col} title={t?.motivo} style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '3px 2px', textAlign: 'center' }}>
-                      {t ? (
+                      {t && temFiltro ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#2979ff' }}>{t.probabilidade}%</span>
-                          <span style={{ fontSize: '8px', color: c.verdeClaro }}>{t.confianca}%</span>
-                          <span style={{ fontSize: '8px', color: '#ffd600', letterSpacing: '0.3px', textAlign: 'center', maxWidth: '48px', lineHeight: '1.1' }}>{t.mercado}</span>
+                          <span style={{ fontSize: '11px', fontWeight: 800, color: c.azul }}>{t.probabilidade}%</span>
+                          <span style={{ fontSize: '9px', color: c.verdeClaro }}>{t.confianca}%</span>
                         </div>
+                      ) : t ? (
+                        <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 600 }}>{t.mercado}</span>
                       ) : <span style={{ color: c.borda }}>—</span>}
                     </td>
                   )
@@ -395,7 +344,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
             {/* Minutos */}
             <tr>
               <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '5px 8px', color: c.texto2, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
-              {colsUsadas.map(col => (
+              {cols.map(col => (
                 <th key={col} style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '5px 5px', color: c.texto2, fontSize: '10px', textAlign: 'center' }}>
                   {col.replace('tempo', '')}
                 </th>
@@ -412,23 +361,26 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
                   <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 8px', color: c.verdeClaro, fontWeight: 700, fontSize: '12px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace' }}>
                     {String(idx).padStart(2, '0')}
                   </td>
-                  {colsUsadas.map(col => {
-                    const p = extrairPlacarRaw(linha[col] as string)
-                    const isGreen = p !== null && (!temFiltro || verificarFiltro(p, filtrosAtivos))
+                  {cols.map(col => {
+                    const p = extrairPlacar(linha[col] as string)
+                    const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     return (
                       <td key={col} style={{ padding: '2px 3px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center' }}>
                         {p ? (
-                          <span style={{ display: 'inline-block', padding: '3px 5px', borderRadius: '3px', fontWeight: 700, fontSize: '12px', fontFamily: 'monospace', background: isGreen ? c.verde : c.vermelho, color: '#fff', minWidth: '38px', textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-block', padding: '3px 5px', borderRadius: '3px',
+                            fontWeight: 700, fontSize: '12px', fontFamily: 'monospace',
+                            background: isGreen ? c.verde : c.vermelho,
+                            color: '#fff', minWidth: '38px', textAlign: 'center',
+                          }}>
                             {p.texto}
                           </span>
-                        ) : (
-                          <span style={{ color: c.borda, fontSize: '10px' }}>—</span>
-                        )}
+                        ) : <span style={{ color: c.borda, fontSize: '10px' }}>—</span>}
                       </td>
                     )
                   })}
                   <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 8px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: ls.pctGreen >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{ls.pctGreen}%</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: ls.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{ls.pct}%</span>
                     <span style={{ fontSize: '10px', color: c.texto2, marginLeft: '4px' }}>{ls.totalGols}g</span>
                   </td>
                 </tr>
@@ -440,13 +392,12 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
       {/* LEGENDA */}
       {mostrarIA && (
-        <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '10px 14px', fontSize: '11px', color: c.texto2, lineHeight: '1.6' }}>
+        <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '10px 14px', fontSize: '11px', color: c.texto2 }}>
           <span style={{ color: c.azul, fontWeight: 700 }}>IA TIPO {tipoIA} </span>
-          {tipoIA === 1 && '— Sequência 2h: detecta correções após sequências longas de RED/GREEN'}
-          {tipoIA === 2 && '— Correlação horária: analisa resultado da hora anterior + ambas marcam'}
-          {tipoIA === 3 && '— Avançada: ciclos do algoritmo + padrões compostos + média de gols'}
-          <span style={{ marginLeft: '12px' }}><span style={{ color: c.verdeClaro }}>■</span> % = prob. de GREEN | </span>
-          <span><span style={{ color: '#4a7fb5' }}>■</span> % menor = confiança</span>
+          {tipoIA === 1 && '— Sequência 2h: detecta correções após sequências longas'}
+          {tipoIA === 2 && '— Correlação horária: analisa resultado da hora anterior'}
+          {tipoIA === 3 && '— Avançada: ciclos do algoritmo + padrões compostos'}
+          {!temFiltro && <span style={{ marginLeft: '12px', color: c.amarelo }}>← Selecione um filtro para ver probabilidade e confiança por minuto</span>}
         </div>
       )}
     </div>
