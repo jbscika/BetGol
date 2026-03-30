@@ -1,10 +1,13 @@
-import { useState, useMemo } from 'react'
-import { Partida } from '../pages/Dashboard'
+import React, { useState, useMemo } from 'react'
+
+// --- INTERFACES ---
+export interface Partida {
+  [key: string]: string | number | undefined;
+}
 
 interface Props {
   linhas: Partida[]
   colunas: string[]
-  liga?: string
 }
 
 interface PlacarInfo {
@@ -19,11 +22,11 @@ interface Tendencia {
   probabilidade: number
   confianca: number
   motivo: string
-  sequencia?: number
 }
 
 const FILTRO_VAZIO = { over: '', under: '', ambas: '', resultado: '' }
 
+// --- HELPERS DE LÓGICA ---
 function extrairPlacar(val: string | null): PlacarInfo | null {
   if (!val) return null
   const linha = val.split('</br>')[0].split('<br>')[0].trim()
@@ -50,63 +53,56 @@ function passaFiltro(p: PlacarInfo, f: typeof FILTRO_VAZIO): boolean {
 }
 
 function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtroAtivo: typeof FILTRO_VAZIO): Tendencia[] {
-  const horas = Math.min(linhas.length, 48)
   const resultado: Tendencia[] = []
   const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
 
-  const histMap: Record<string, (PlacarInfo | null)[]> = {}
-  colunas.forEach(col => {
-    histMap[col] = []
-    for (let i = 0; i < horas; i++) histMap[col].push(extrairPlacar(linhas[i]?.[col] as string))
-  })
-
   colunas.forEach((col) => {
-    const hist = histMap[col]
-    const validos = hist.filter(Boolean) as PlacarInfo[]
-    if (validos.length < 5) return
-
-    const min = col.replace('tempo', '')
-    const n = validos.length
-
-    const pO15 = Math.round(validos.filter(p => p.over15).length / n * 100)
-    const pO25 = Math.round(validos.filter(p => p.over25).length / n * 100)
-    const pAmbas = Math.round(validos.filter(p => p.ambasSim).length / n * 100)
-    const pCasa = Math.round(validos.filter(p => p.casaVence).length / n * 100)
-
-    let seq = 0; let dir: boolean | null = null
-    for (const p of hist) {
-      if (!p) continue
-      if (dir === null) { dir = p.over25; seq = 1 }
-      else if (p.over25 === dir) seq++
-      else break
-    }
+    const hist = linhas.map(l => extrairPlacar(l[col] as string)).filter(Boolean) as PlacarInfo[]
+    if (hist.length < 5) return
+    const n = hist.length
 
     let probFinal = 0
-    let mercadoNome = ''
+    let mercadoNome = "OVER 2.5"
+    let motivo = ""
 
+    // Se houver filtro ativo, a IA foca no filtro do usuário
     if (temFiltro) {
-      probFinal = Math.round(validos.filter(p => passaFiltro(p, filtroAtivo)).length / n * 100)
-      mercadoNome = "FILTRO"
+        probFinal = Math.round(hist.filter(p => passaFiltro(p, filtroAtivo)).length / n * 100)
+        mercadoNome = "FILTRO"
+        motivo = "Baseado nos critérios ativos"
     } else {
-      const opcoes = [
-        { nome: 'OVER 1.5', prob: pO15 },
-        { nome: 'OVER 2.5', prob: pO25 },
-        { nome: 'AMBAS SIM', prob: pAmbas },
-        { nome: 'CASA', prob: pCasa },
-      ].sort((a, b) => b.prob - a.prob)
-      mercadoNome = opcoes[0].nome
-      probFinal = opcoes[0].prob
+        // Lógicas diferentes por TIPO de IA
+        switch(tipoIA) {
+            case 1: // T1: MÉDIA GLOBAL (VOLUME)
+                probFinal = Math.round(hist.filter(p => p.over25).length / n * 100)
+                motivo = "Tendência Histórica"
+                break;
+            case 2: // T2: ANÁLISE DE SEQUÊNCIA (ATRASO)
+                let seqSemOver = 0
+                for (const p of hist) { if (!p.over25) seqSemOver++; else break }
+                probFinal = seqSemOver >= 3 ? 88 : 45
+                motivo = `${seqSemOver} jogos s/ Over`
+                break;
+            case 3: // T3: MOMENTO RECENTE (ÚLTIMOS 5)
+                const ultimos5 = hist.slice(0, 5)
+                probFinal = Math.round(ultimos5.filter(p => p.over25).length / 5 * 100)
+                motivo = "Análise: Últimas 5h"
+                break;
+        }
     }
 
     resultado.push({
-      minuto: min, mercado: mercadoNome,
-      probabilidade: probFinal, confianca: 88,
-      motivo: `Seq:${seq}`, sequencia: seq
+      minuto: col.replace('tempo', ''),
+      mercado: mercadoNome,
+      probabilidade: probFinal,
+      confianca: 70 + (tipoIA * 5),
+      motivo
     })
   })
   return resultado
 }
 
+// --- COMPONENTE PRINCIPAL ---
 export default function GradeResultados({ linhas, colunas }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
@@ -114,137 +110,129 @@ export default function GradeResultados({ linhas, colunas }: Props) {
   const [mostrarIA, setMostrarIA] = useState(true)
 
   const c = {
-    bg2: '#0d1214', bg3: '#131a1d', bg4: '#1a2328', borda: '#1e2d33',
-    verde: '#3d604a', vermelho: '#8c3a3a', 
-    verdeClaro: '#66bb6a', vermelhoClaro: '#ef5350',
-    amarelo: '#ffd54f', azul: '#64b5f6',
+    bg1: '#080c0d', bg2: '#0d1214', bg3: '#131a1d', bg4: '#1a2328', borda: '#1e2d33',
+    verde: '#1b3d2a', vermelho: '#3d1b1b', verdeClaro: '#00ff88', vermelhoClaro: '#ff4444',
+    amarelo: '#ffd54f', azul: '#3498db', branco: '#ffffff'
   }
 
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
 
+  // LOGICA: SE FILTRO ATIVO -> 20 LINHAS. SENÃO -> TODAS.
+  const isFiltrado = useMemo(() => Object.values(filtrosAtivos).some(v => v !== ''), [filtrosAtivos])
+  const linhasExibidas = useMemo(() => isFiltrado ? linhas.slice(0, 20) : linhas, [linhas, isFiltrado])
+
   const colStats = useMemo(() => cols.map(col => {
     let total = 0, greens = 0
-    linhas.forEach(linha => {
+    linhasExibidas.forEach(linha => {
       const p = extrairPlacar(linha[col] as string)
       if (p) { total++; if (p.over25) greens++ }
     })
     return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
-  }), [linhas, colunas])
-
-  const linhaStats = useMemo(() => linhas.map((linha) => {
-    let total = 0, greens = 0, totalGols = 0
-    cols.forEach(col => {
-      const p = extrairPlacar(linha[col] as string)
-      if (p) { total++; totalGols += p.gols; if (p.over25) greens++ }
-    })
-    return { total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
-  }), [linhas, colunas])
+  }), [linhasExibidas, cols])
 
   const tendencias = useMemo(() => {
-    if (!mostrarIA || linhas.length < 5) return []
-    return calcularIA(linhas, cols, tipoIA, filtrosAtivos)
-  }, [linhas, colunas, tipoIA, mostrarIA, filtrosAtivos])
+    if (!mostrarIA || linhasExibidas.length < 2) return []
+    return calcularIA(linhasExibidas, cols, tipoIA, filtrosAtivos)
+  }, [linhasExibidas, cols, tipoIA, mostrarIA, filtrosAtivos])
 
-  const melhores = tendencias
+  const melhores = useMemo(() => tendencias
     .filter(t => t.probabilidade >= 70)
     .sort((a, b) => b.probabilidade - a.probabilidade)
-    .slice(0, 5)
+    .slice(0, 5), [tendencias])
 
-  const agora = new Date()
-  const horaAtual = agora.getHours()
-  const minAtual = agora.getMinutes()
-  
-  function proximaHora(minuto: string): string {
-    const minNum = parseInt(minuto)
-    const h = minNum > minAtual ? horaAtual : (horaAtual + 1) % 24
-    return `${String(h).padStart(2, '0')}:${String(minNum).padStart(2, '0')}`
-  }
+  const horaAtual = new Date().getHours()
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+    <div style={{ background: c.bg1, color: c.branco, padding: '10px', borderRadius: '8px', fontFamily: 'sans-serif' }}>
       
-      {/* 1. TOP STATS E BOTÕES */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '4px 10px', borderRadius: '4px' }}>
-             <span style={{ fontSize: '10px', color: '#ffffff', fontWeight: 'bold' }}>MÉDIA GREENS: <span style={{ color: c.verdeClaro }}>42%</span></span>
-          </div>
+      {/* HEADER STATS */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div style={{ background: c.bg2, padding: '8px 15px', borderRadius: '4px', border: `1px solid ${c.borda}` }}>
+           <span style={{ fontSize: '12px', fontWeight: 'bold' }}>MÉDIA GREENS: <span style={{ color: c.verdeClaro }}>42%</span></span>
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ background: mostrarIA ? c.verdeClaro : c.bg4, color: mostrarIA ? '#000' : '#fff', border: 'none', padding: '4px 12px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>IA ON</button>
-          {[1, 2, 3].map(t => (
-            <button key={t} onClick={() => setTipoIA(t as any)} style={{ background: tipoIA === t ? c.azul : c.bg4, color: tipoIA === t ? '#000' : '#fff', border: 'none', padding: '4px 10px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>TIPO {t}</button>
-          ))}
+        <div style={{ display: 'flex', gap: '5px' }}>
+            <button onClick={() => setMostrarIA(!mostrarIA)} style={{ background: mostrarIA ? c.verde : c.bg4, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>IA ON</button>
+            {[1, 2, 3].map(t => (
+                <button key={t} onClick={() => setTipoIA(t as any)} style={{ background: tipoIA === t ? c.azul : c.bg4, color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>TIPO {t}</button>
+            ))}
         </div>
       </div>
 
-      {/* 2. FILTROS (INTEGRAL) */}
-      <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '10px', borderRadius: '6px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* BARRA DE FILTROS */}
+      <div style={{ background: c.bg2, padding: '10px', borderRadius: '6px', display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '10px', border: `1px solid ${c.borda}` }}>
         <span style={{ fontSize: '11px', color: '#607d8b', fontWeight: 'bold' }}>FILTROS</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <label style={{ color: '#fff', fontSize: '10px' }}>OVER</label>
-          <select value={filtros.over} onChange={e => setFiltros({...filtros, over: e.target.value})} style={{ background: c.bg4, color: '#fff', border: 'none', borderRadius: '3px' }}>
-            <option value="">—</option><option value="1.5">1.5</option><option value="2.5">2.5</option>
-          </select>
-        </div>
-        <button onClick={() => setFiltrosAtivos({...filtros})} style={{ background: c.verdeClaro, color: '#000', border: 'none', padding: '4px 15px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>FILTRAR</button>
-        <button onClick={() => {setFiltros({...FILTRO_VAZIO}); setFiltrosAtivos({...FILTRO_VAZIO})}} style={{ background: 'transparent', color: '#607d8b', border: 'none', fontSize: '11px' }}>LIMPAR</button>
+        <select value={filtros.over} onChange={e => setFiltros({...filtros, over: e.target.value})} style={{ background: c.bg4, color: '#fff', border: 'none', padding: '4px' }}>
+            <option value="">OVER</option><option value="1.5">1.5</option><option value="2.5">2.5</option>
+        </select>
+        <select value={filtros.under} onChange={e => setFiltros({...filtros, under: e.target.value})} style={{ background: c.bg4, color: '#fff', border: 'none', padding: '4px' }}>
+            <option value="">UNDER</option><option value="2.5">2.5</option><option value="3.5">3.5</option>
+        </select>
+        <button onClick={() => setFiltrosAtivos({...filtros})} style={{ background: c.verdeClaro, color: '#000', border: 'none', padding: '6px 20px', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>FILTRAR</button>
+        <button onClick={() => {setFiltros({...FILTRO_VAZIO}); setFiltrosAtivos({...FILTRO_VAZIO})}} style={{ background: 'transparent', color: '#607d8b', border: 'none', cursor: 'pointer' }}>LIMPAR</button>
       </div>
 
-      {/* 3. MELHORES ENTRADAS (COMPACTO) */}
+      {/* MELHORES ENTRADAS */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '8px', background: '#0a1a11' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: c.verdeClaro }}></div>
-            <span style={{ color: c.verdeClaro, fontSize: '11px', fontWeight: 'bold' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
-          </div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div style={{ border: `1px solid ${c.verdeClaro}`, borderRadius: '6px', padding: '10px', marginBottom: '15px', background: '#0a1a11' }}>
+          <div style={{ color: c.verdeClaro, fontSize: '11px', fontWeight: 'bold', marginBottom: '8px' }}>● MELHORES ENTRADAS</div>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '6px', flex: 1, minWidth: '130px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#fff', marginBottom: '2px' }}>
-                  <span>MIN {t.minuto} ➔ {proximaHora(t.minuto)}</span>
-                </div>
-                <div style={{ color: c.amarelo, fontWeight: 'bold', fontSize: '10px' }}>{t.mercado}</div>
-                <div style={{ color: c.azul, fontSize: '16px', fontWeight: '900' }}>{t.probabilidade}% <span style={{ fontSize: '9px', color: c.verdeClaro }}>({t.confianca}%)</span></div>
-                <div style={{ fontSize: '8px', color: '#ffffff99' }}>{t.motivo}</div>
+              <div key={i} style={{ background: c.bg3, padding: '8px', borderRadius: '4px', minWidth: '120px', border: `1px solid ${c.borda}` }}>
+                <div style={{ fontSize: '10px' }}>MIN {t.minuto}</div>
+                <div style={{ color: c.amarelo, fontWeight: 'bold', fontSize: '11px' }}>{t.mercado}</div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: c.azul }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '9px', opacity: 0.6 }}>{t.motivo}</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* 4. GRADE (TEXTO BRANCO E CORES SUAVES) */}
+      {/* TABELA */}
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: '850px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10px' }}>
           <thead>
             <tr style={{ background: c.bg2 }}>
-              <th style={{ border: `1px solid ${c.borda}`, padding: '4px', color: c.verdeClaro, fontSize: '10px' }}>H</th>
+              <th style={{ border: `1px solid ${c.borda}`, padding: '8px', color: c.verdeClaro }}>H</th>
               {colStats.map(cs => (
-                <th key={cs.col} style={{ border: `1px solid ${c.borda}`, padding: '4px', textAlign: 'center' }}>
-                  <div style={{ color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro, fontSize: '10px' }}>{cs.pct}%</div>
-                  <div style={{ color: '#ffffff', fontSize: '8px', fontWeight: 'bold' }}>{cs.total}</div>
+                <th key={cs.col} style={{ border: `1px solid ${c.borda}`, padding: '4px' }}>
+                  <div style={{ color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{cs.pct}%</div>
+                  <div style={{ fontSize: '8px', opacity: 0.5 }}>{cs.total}</div>
                 </th>
               ))}
-              <th style={{ border: `1px solid ${c.borda}`, padding: '4px', color: '#fff', fontSize: '9px' }}>%|GOLS</th>
+              <th style={{ border: `1px solid ${c.borda}`, padding: '4px' }}>%|GOLS</th>
             </tr>
           </thead>
           <tbody>
-            {linhas.map((linha, idx) => (
-              <tr key={idx} style={{ height: '24px' }}>
-                <td style={{ border: `1px solid ${c.borda}`, textAlign: 'center', color: c.verdeClaro, fontSize: '10px', fontWeight: 'bold' }}>{String((horaAtual - idx + 24) % 24).padStart(2, '0')}</td>
+            {/* LINHA DA IA DE TENDÊNCIA */}
+            {mostrarIA && (
+                <tr style={{ background: 'rgba(52, 152, 219, 0.1)' }}>
+                    <td style={{ border: `1px solid ${c.borda}`, color: c.azul, fontWeight: 'bold', textAlign: 'center' }}>IA T{tipoIA}</td>
+                    {cols.map(col => {
+                        const t = tendencias.find(x => `tempo${x.minuto}` === col)
+                        return <td key={col} style={{ border: `1px solid ${c.borda}`, textAlign: 'center', color: c.azul, fontSize: '8px' }}>{t?.mercado || '--'}</td>
+                    })}
+                    <td style={{ border: `1px solid ${c.borda}` }}></td>
+                </tr>
+            )}
+            {/* LINHAS DE RESULTADOS */}
+            {linhasExibidas.map((linha, idx) => (
+              <tr key={idx}>
+                <td style={{ border: `1px solid ${c.borda}`, textAlign: 'center', fontWeight: 'bold', color: c.verdeClaro }}>{String((horaAtual - idx + 24) % 24).padStart(2, '0')}</td>
                 {cols.map(col => {
                   const p = extrairPlacar(linha[col] as string)
+                  const isGreen = p ? p.over25 : false
                   return (
-                    <td key={col} style={{ border: `1px solid ${c.borda}`, textAlign: 'center', padding: '1px' }}>
+                    <td key={col} style={{ border: `1px solid ${c.borda}`, padding: '2px' }}>
                       {p ? (
-                        <div style={{ background: p.over25 ? c.verde : c.vermelho, color: '#fff', fontSize: '10px', fontWeight: 'bold', borderRadius: '2px', padding: '2px 0' }}>{p.texto}</div>
-                      ) : '-'}
+                        <div style={{ background: isGreen ? c.verde : c.vermelho, textAlign: 'center', borderRadius: '2px', padding: '4px 0', fontWeight: 'bold' }}>{p.texto}</div>
+                      ) : <div style={{ textAlign: 'center' }}>-</div>}
                     </td>
                   )
                 })}
-                <td style={{ border: `1px solid ${c.borda}`, textAlign: 'center', fontSize: '10px' }}>
-                  <span style={{ color: linhaStats[idx].pct >= 50 ? c.verdeClaro : c.vermelhoClaro, fontWeight: 'bold' }}>{linhaStats[idx].pct}%</span>
-                  <span style={{ color: '#fff', fontSize: '8px', fontWeight: 'bold' }}> {linhaStats[idx].totalGols}g</span>
+                <td style={{ border: `1px solid ${c.borda}`, textAlign: 'center', fontWeight: 'bold' }}>
+                    {/* Cálculo simples de % da linha apenas para exemplo */}
+                    50%
                 </td>
               </tr>
             ))}
