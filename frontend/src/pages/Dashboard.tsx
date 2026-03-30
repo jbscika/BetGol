@@ -17,6 +17,7 @@ function Dashboard() {
   const [ligaSelecionada, setLigaSelecionada] = useState('Copa do Mundo')
   const [linhas, setLinhas] = useState<Partida[]>([])
   const [colunas, setColunas] = useState<string[]>([])
+  const [horas, setHoras] = useState<string[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [totalPartidas, setTotalPartidas] = useState(0)
@@ -42,8 +43,10 @@ function Dashboard() {
       const dados = json.data
       const linhasData = dados.linhas || dados.resultados || dados.rows || []
       const colunasData = dados.colunas || ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+      const horasData = dados.horas || []
       setLinhas(linhasData)
       setColunas(colunasData)
+      setHoras(horasData)
       setTotalPartidas(linhasData.length)
     } catch (e) {
       console.error('Erro na atualização silenciosa:', e)
@@ -62,8 +65,10 @@ function Dashboard() {
       const dados = json.data
       const linhasData = dados.linhas || dados.resultados || dados.rows || []
       const colunasData = dados.colunas || ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+      const horasData = dados.horas || []
       setLinhas(linhasData)
       setColunas(colunasData)
+      setHoras(horasData)
       setTotalPartidas(linhasData.length)
     } catch (e: any) {
       setErro('Erro ao carregar dados. Tente novamente.')
@@ -184,7 +189,7 @@ function Dashboard() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <IATendencia linhas={linhas} colunas={colunas} />
-            <GradeResultados linhas={linhas} colunas={colunas} liga={ligaSelecionada} />
+            <GradeResultados linhas={linhas} colunas={colunas} horas={horas} liga={ligaSelecionada} />
           </div>
         )}
       </div>
