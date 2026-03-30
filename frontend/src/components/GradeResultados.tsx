@@ -231,7 +231,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
     .slice(0, 5)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
       {/* STATS */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
@@ -299,36 +299,37 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
         </div>
       </div>
 
-      {/* MELHORES ENTRADAS - ALTURA REDUZIDA AQUI */}
+      {/* MELHORES ENTRADAS - VERSÃO SUPER COMPACTA */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '8px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.verdeClaro }} />
-            <span style={{ fontSize: '12px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
-            <span style={{ fontSize: '11px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
-            {liga && <span style={{ fontSize: '11px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
+        <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '6px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: c.verdeClaro }} />
+            <span style={{ fontSize: '11px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '1px' }}>MELHORES ENTRADAS</span>
+            <span style={{ fontSize: '10px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
+            {liga && <span style={{ fontSize: '10px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '4px', padding: '1px 6px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '6px 10px', minWidth: '115px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '1px' }}>
+              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '4px 8px', minWidth: '100px', flex: '1 1 auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1px', alignItems: 'center' }}>
                   <span style={{ fontSize: '9px', color: c.texto2 }}>MIN {t.minuto}</span>
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: c.amarelo }}>→ {proximaHora(t.minuto)}</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: c.amarelo }}>{proximaHora(t.minuto)}</span>
                 </div>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: c.amarelo, marginBottom: '1px' }}>{t.mercado}</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
-                <div style={{ fontSize: '9px', color: c.verdeClaro, marginTop: '1px', fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '9px', color: c.texto2, marginTop: '1px' }}>{t.motivo.split('|')[0]}</div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: c.amarelo, marginBottom: '2px' }}>{t.mercado}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</span>
+                  <span style={{ fontSize: '9px', color: c.verdeClaro, fontWeight: 700 }}>{t.confianca}%</span>
+                </div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '10px', color: c.texto2, marginTop: '6px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
+          <div style={{ fontSize: '10px', color: c.texto2, marginTop: '6px' }}>⚠️ Prob ≥ 65% | Conf ≥ 70%</div>
         </div>
       )}
 
-      {/* GRADE - ALINHAMENTO CORRIGIDO AQUI */}
-      <div style={{ overflowX: 'auto', paddingLeft: '2px' }}>
-        <table style={{ borderCollapse: 'collapse', fontSize: '11px' }}>
+      {/* GRADE - ALINHAMENTO CORRIGIDO */}
+      <div style={{ overflowX: 'auto', marginTop: '4px' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: '11px', marginLeft: '2px' }}>
           <thead>
             {/* % por coluna */}
             <tr>
@@ -416,12 +417,12 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
       {/* LEGENDA */}
       {mostrarIA && (
-        <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '10px 14px', fontSize: '11px', color: c.texto2 }}>
+        <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '8px 12px', fontSize: '11px', color: c.texto2 }}>
           <span style={{ color: c.azul, fontWeight: 700 }}>IA TIPO {tipoIA} </span>
-          {tipoIA === 1 && '— Sequência 2h: detecta correções após sequências longas'}
-          {tipoIA === 2 && '— Correlação horária: analisa resultado da hora anterior'}
-          {tipoIA === 3 && '— Avançada: ciclos do algoritmo + padrões compostos'}
-          {!temFiltro && <span style={{ marginLeft: '12px', color: c.amarelo }}>← Selecione um filtro para ver probabilidade e confiança por minuto</span>}
+          {tipoIA === 1 && '— Seq. 2h'}
+          {tipoIA === 2 && '— Corr. Horária'}
+          {tipoIA === 3 && '— Avançada'}
+          {!temFiltro && <span style={{ marginLeft: '12px', color: c.amarelo }}>← Filtre para ver detalhes</span>}
         </div>
       )}
     </div>
