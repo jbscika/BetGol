@@ -224,18 +224,16 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
 
-  // Calcular hora da próxima partida por minuto
+  // Calcular hora da próxima partida
   const agora = new Date()
   const horaAtual = agora.getHours()
   const minAtual = agora.getMinutes()
 
+  // A linha 0 do topo = hora atual, linha 1 = hora anterior, etc.
+  // Próxima partida = hora atual se ainda não passou o minuto, senão próxima hora
   function proximaHora(minuto: string): string {
     const minNum = parseInt(minuto)
-    // Próxima ocorrência desse minuto
-    let h = horaAtual
-    let m = minAtual
-    // Avança até o próximo minuto correspondente
-    if (minNum <= m) h = (h + 1) % 24
+    const h = minNum > minAtual ? horaAtual : (horaAtual + 1) % 24
     return `${String(h).padStart(2, '0')}:${String(minNum).padStart(2, '0')}`
   }
 
@@ -347,7 +345,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
           <thead>
             {/* % por coluna */}
             <tr>
-              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '5px 8px', color: c.verdeClaro, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, minWidth: '44px' }}>HORA</th>
+              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '5px 8px', color: c.verdeClaro, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, minWidth: '28px' }}>H</th>
               {colStats.map(cs => (
                 <th key={cs.col} style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '4px 5px', textAlign: 'center', minWidth: '52px' }}>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{cs.pct}%</div>
@@ -398,7 +396,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
               return (
                 <tr key={idx}>
                   <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 6px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '24px' }}>
-                    {String(idx).padStart(2, '0')}
+                    {String((horaAtual - idx + 24) % 24).padStart(2, '0')}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
