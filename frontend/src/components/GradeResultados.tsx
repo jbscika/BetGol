@@ -53,7 +53,6 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   const resultado: Tendencia[] = []
   const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
 
-  // Pré-calcular histórico de todas as colunas para correlação entre minutos
   const histMap: Record<string, (PlacarInfo | null)[]> = {}
   colunas.forEach(col => {
     histMap[col] = []
@@ -78,7 +77,6 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const pFora = Math.round(validos.filter(p => p.foraVence).length / n * 100)
     const mediaG = Math.round(validos.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
 
-    // Sequência atual
     let seq = 0; let dir: boolean | null = null
     for (const p of hist) {
       if (!p) continue
@@ -87,12 +85,10 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       else break
     }
 
-    // Variação recente (últimas 5 vs histórico)
     const ult5 = hist.slice(0, 5).filter(Boolean) as PlacarInfo[]
     const pO25Rec = ult5.length > 0 ? Math.round(ult5.filter(p => p.over25).length / ult5.length * 100) : pO25
     const varRec = pO25Rec - pO25
 
-    // Correlação com minuto anterior
     let corrBoost = 0
     if (colIdx > 0) {
       const colAnt = colunas[colIdx - 1]
@@ -102,13 +98,12 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         const a = histAnt[i], b = hist[i]
         if (!a || !b) continue
         tot++
-        if (!a.over25 && b.over25) concord++ // ant RED → atual GREEN
+        if (!a.over25 && b.over25) concord++
       }
       const pCorr = tot > 0 ? concord / tot : 0
       if (histAnt[0] && !histAnt[0].over25 && pCorr > 0.5) corrBoost = Math.round(pCorr * 18)
     }
 
-    // Análise de ciclos
     let cc = 0; let ant = hist[0]?.over25
     for (let i = 1; i < Math.min(hist.length, 24); i++) {
       const p = hist[i]; if (!p) continue
@@ -117,7 +112,6 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const cicloMedio = cc > 0 ? Math.round(24 / cc) : 0
     const cicloBoost = cicloMedio > 0 && seq >= cicloMedio ? Math.min((seq - cicloMedio + 1) * 10, 25) : 0
 
-    // Boost por tipo de IA
     let boost = 0
     if (tipoIA === 1) {
       boost = seq >= 3 && dir === false ? seq * 8 : seq >= 3 && dir === true ? -(seq * 5) : 0
@@ -181,7 +175,6 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
 
-  // Stats por coluna
   const colStats = useMemo(() => cols.map(col => {
     let total = 0, greens = 0, totalGols = 0
     linhas.forEach(linha => {
@@ -191,7 +184,6 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
     return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
   }), [linhas, colunas, filtrosAtivos])
 
-  // Stats por linha
   const linhaStats = useMemo(() => linhas.map((linha, idx) => {
     let total = 0, greens = 0, totalGols = 0
     cols.forEach(col => {
@@ -201,7 +193,6 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
     return { idx, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
   }), [linhas, colunas])
 
-  // IA Tendência — recalcula quando linhas, colunas, tipoIA ou filtro mudam
   const tendencias = useMemo(() => {
     if (!mostrarIA || linhas.length < 5) return []
     return calcularIA(linhas, cols, tipoIA, filtrosAtivos)
@@ -224,20 +215,16 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
 
-  // Calcular hora da próxima partida
   const agora = new Date()
   const horaAtual = agora.getHours()
   const minAtual = agora.getMinutes()
 
-  // A linha 0 do topo = hora atual, linha 1 = hora anterior, etc.
-  // Próxima partida = hora atual se ainda não passou o minuto, senão próxima hora
   function proximaHora(minuto: string): string {
     const minNum = parseInt(minuto)
     const h = minNum > minAtual ? horaAtual : (horaAtual + 1) % 24
     return `${String(h).padStart(2, '0')}:${String(minNum).padStart(2, '0')}`
   }
 
-  // Melhores entradas
   const melhores = tendencias
     .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
     .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
@@ -312,35 +299,35 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
         </div>
       </div>
 
-      {/* MELHORES ENTRADAS */}
+      {/* MELHORES ENTRADAS - ALTURA REDUZIDA AQUI */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '14px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '8px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.verdeClaro }} />
             <span style={{ fontSize: '12px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
             <span style={{ fontSize: '11px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
             {liga && <span style={{ fontSize: '11px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '8px 12px', minWidth: '120px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '10px', color: c.texto2 }}>MIN {t.minuto}</span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: c.amarelo }}>→ {proximaHora(t.minuto)}</span>
+              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '6px 10px', minWidth: '115px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '1px' }}>
+                  <span style={{ fontSize: '9px', color: c.texto2 }}>MIN {t.minuto}</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: c.amarelo }}>→ {proximaHora(t.minuto)}</span>
                 </div>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: c.amarelo, marginBottom: '2px' }}>{t.mercado}</div>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
-                <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '10px', color: c.texto2, marginTop: '2px' }}>{t.motivo.split('|')[0]}</div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: c.amarelo, marginBottom: '1px' }}>{t.mercado}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '9px', color: c.verdeClaro, marginTop: '1px', fontWeight: 700 }}>Conf: {t.confianca}%</div>
+                <div style={{ fontSize: '9px', color: c.texto2, marginTop: '1px' }}>{t.motivo.split('|')[0]}</div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '11px', color: c.texto2, marginTop: '10px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
+          <div style={{ fontSize: '10px', color: c.texto2, marginTop: '6px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
         </div>
       )}
 
-      {/* GRADE */}
-      <div style={{ overflowX: 'auto' }}>
+      {/* GRADE - ALINHAMENTO CORRIGIDO AQUI */}
+      <div style={{ overflowX: 'auto', paddingLeft: '2px' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '11px' }}>
           <thead>
             {/* % por coluna */}
