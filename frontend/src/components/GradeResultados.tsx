@@ -176,10 +176,12 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
         <div style={{ display: 'flex', gap: '8px' }}>
           <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '4px', padding: '4px 10px' }}>
-            <div style={{ fontSize: '9px', color: c.texto2 }}>GREENS: <span style={{ color: c.verdeClaro }}>{pctGeral}%</span></div>
+            {/* Texto Secundário aqui alterado para BRANCO */}
+            <div style={{ fontSize: '9px', color: '#ffffff', fontWeight: 'bold' }}>GREENS: <span style={{ color: c.verdeClaro }}>{pctGeral}%</span></div>
           </div>
           <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '4px', padding: '4px 10px' }}>
-            <div style={{ fontSize: '9px', color: c.texto2 }}>MÉDIA GOLS: <span style={{ color: c.amarelo }}>{mediaGols}</span></div>
+             {/* Texto Secundário aqui alterado para BRANCO */}
+            <div style={{ fontSize: '9px', color: '#ffffff', fontWeight: 'bold' }}>MÉDIA GOLS: <span style={{ color: c.amarelo }}>{mediaGols}</span></div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -190,16 +192,16 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
         </div>
       </div>
 
-      {/* MELHORES ENTRADAS - ULTRA COMPACTO COM TEXTO PRETO ADICIONADO AQUI */}
+      {/* MELHORES ENTRADAS - ULTRA COMPACTO COM TEXTO BRANCO ADICIONADO AQUI */}
       {mostrarIA && melhores.length > 0 && (
         <div style={{ background: '#071a0f', border: `1px solid ${c.verdeClaro}`, borderRadius: '4px', padding: '4px 8px', width: '100%' }}>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {melhores.map((t, i) => (
               <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}33`, borderRadius: '3px', padding: '2px 6px', flex: '1' }}>
-                {/* Texto cinza alterado para PRETO aqui */}
-                <div style={{ fontSize: '8px', color: '#000000', fontWeight: 'bold' }}>{t.minuto} @ {proximaHora(t.minuto)}</div>
-                <div style={{ fontSize: '9px', fontWeight: 'bold', color: c.amarelo }}>{t.mercado}</div>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: c.azul }}>{t.probabilidade}% <span style={{ fontSize: '8px', color: c.verdeClaro }}>({t.confianca}%)</span></div>
+                {/* Texto cinza alterado para BRANCO Puro aqui */}
+                <div style={{ fontSize: '8px', color: '#ffffff', fontWeight: 'bold', fontFamily: 'monospace' }}>{t.minuto} @ {proximaHora(t.minuto)}</div>
+                <div style={{ fontSize: '9px', fontWeight: 'bold', color: c.amarelo, lineHeight: 1 }}>{t.mercado}</div>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: c.azul, marginTop: '1px', lineHeight: 1 }}>{t.probabilidade}% <span style={{ fontSize: '8px', color: c.verdeClaro, fontWeight: '700' }}>({t.confianca}%)</span></div>
               </div>
             ))}
           </div>
@@ -215,8 +217,8 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
               {colStats.map(cs => (
                 <th key={cs.col} style={{ border: `1px solid ${c.borda}`, padding: '4px', textAlign: 'center' }}>
                   <div style={{ color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro, fontSize: '10px' }}>{cs.pct}%</div>
-                  {/* Texto cinza secundário na tabela - alterado para PRETO */}
-                  <div style={{ color: '#000000', fontSize: '8px', fontWeight: 'bold' }}>{cs.total}</div>
+                  {/* Texto cinza secundário na tabela - alterado para BRANCO */}
+                  <div style={{ color: '#ffffff', fontSize: '8px', fontWeight: 'bold' }}>{cs.total}</div>
                 </th>
               ))}
               <th style={{ border: `1px solid ${c.borda}`, padding: '4px', fontSize: '9px', color: c.texto2 }}>%|G</th>
@@ -242,8 +244,8 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
                   })}
                   <td style={{ border: `1px solid ${c.borda}`, textAlign: 'center', fontSize: '10px' }}>
                     <span style={{ color: ls.pct >= 50 ? c.verdeClaro : c.vermelhoClaro, fontWeight: 'bold' }}>{ls.pct}%</span>
-                    {/* Texto cinza secundário na linha da tabela - alterado para PRETO */}
-                    <span style={{ color: '#000000', fontSize: '8px', fontWeight: 'bold' }}> {ls.totalGols}g</span>
+                    {/* Texto cinza secundário na linha da tabela - alterado para BRANCO */}
+                    <span style={{ color: '#ffffff', fontSize: '8px', fontWeight: 'bold' }}> {ls.totalGols}g</span>
                   </td>
                 </tr>
               )
