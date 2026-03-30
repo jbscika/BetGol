@@ -368,7 +368,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
                           <span style={{ fontSize: '9px', color: c.verdeClaro, lineHeight: '1.2' }}>{t.confianca}%</span>
                         </div>
                       ) : t ? (
-                        <span style={{ fontSize: '8px', color: c.texto2, fontWeight: 600 }}>{t.mercado}</span>
+                        <span style={{ fontSize: '8px', color: '#fff', fontWeight: 600 }}>{t.mercado}</span>
                       ) : <span style={{ color: c.borda }}>—</span>}
                     </td>
                   )
