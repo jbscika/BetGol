@@ -224,32 +224,105 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
 
-  // Calcular hora da próxima partida por minuto
+  // Calcular hora da próxima partida
   const agora = new Date()
   const horaAtual = agora.getHours()
   const minAtual = agora.getMinutes()
 
+  // A linha 0 do topo = hora atual, linha 1 = hora anterior, etc.
+  // Próxima partida = hora atual se ainda não passou o minuto, senão próxima hora
   function proximaHora(minuto: string): string {
     const minNum = parseInt(minuto)
-    // Próxima ocorrência desse minuto
-    let h = horaAtual
-    let m = minAtual
-    // Avança até o próximo minuto correspondente
-    if (minNum <= m) h = (h + 1) % 24
+    const h = minNum > minAtual ? horaAtual : (horaAtual + 1) % 24
     return `${String(h).padStart(2, '0')}:${String(minNum).padStart(2, '0')}`
   }
 
   // Melhores entradas
   const melhores = tendencias
     .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
-@@ -310,12 +325,15 @@
+    .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
+    .slice(0, 5)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* STATS */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          {[
+            { lbl: 'MEDIA GREENS', val: `${pctGeral}%`, cor: c.verdeClaro },
+            { lbl: 'MÉDIA GOLS', val: String(mediaGols), cor: c.amarelo },
+            { lbl: 'PARTIDAS', val: String(totalP), cor: c.texto },
+          ].map(s => (
+            <div key={s.lbl} style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '8px 14px' }}>
+              <div style={{ fontSize: '10px', color: c.texto2, letterSpacing: '2px' }}>{s.lbl}</div>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: s.cor, fontFamily: 'monospace' }}>{s.val}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: mostrarIA ? c.verdeClaro : c.bg4, color: mostrarIA ? '#000' : c.texto2 }}>
+            IA {mostrarIA ? 'ON' : 'OFF'}
+          </button>
+          {mostrarIA && ([1,2,3] as const).map(t => (
+            <button key={t} onClick={() => setTipoIA(t)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: tipoIA === t ? c.azul : c.bg4, color: tipoIA === t ? '#fff' : c.texto2 }}>
+              TIPO {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* FILTROS */}
+      <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '8px', padding: '12px 16px' }}>
+        <div style={{ fontSize: '10px', color: c.texto2, letterSpacing: '2px', marginBottom: '10px' }}>FILTROS</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>OVER</span>
+            <select style={sel} value={filtros.over} onChange={e => setFiltros(p => ({ ...p, over: e.target.value }))}>
+              <option value="">—</option>
+              {['0.5','1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>UNDER</span>
+            <select style={sel} value={filtros.under} onChange={e => setFiltros(p => ({ ...p, under: e.target.value }))}>
+              <option value="">—</option>
+              {['1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>AMBAS</span>
+            <select style={sel} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
+              <option value="">—</option>
+              <option value="sim">Sim</option>
+              <option value="nao">Não</option>
+            </select>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>RESULTADO</span>
+            <select style={sel} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
+              <option value="">—</option>
+              <option value="casa">Casa</option>
+              <option value="empate">Empate</option>
+              <option value="fora">Fora</option>
+            </select>
+          </div>
+          <button onClick={aplicar} style={{ background: c.verdeClaro, color: '#000', border: 'none', padding: '7px 18px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
+          <button onClick={limpar} style={{ background: 'transparent', color: c.texto2, border: `1px solid ${c.borda}`, padding: '7px 14px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+        </div>
+      </div>
+
+      {/* MELHORES ENTRADAS */}
+      {mostrarIA && melhores.length > 0 && (
+        <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '14px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.verdeClaro }} />
+            <span style={{ fontSize: '12px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
+            <span style={{ fontSize: '11px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
+            {liga && <span style={{ fontSize: '11px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '130px' }}>
-                <div style={{ fontSize: '10px', color: c.texto2, marginBottom: '2px' }}>MIN {t.minuto}</div>
-                <div style={{ fontSize: '12px', fontWeight: 800, color: c.amarelo, marginBottom: '4px' }}>{t.mercado}</div>
-                <div style={{ fontSize: '22px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
               <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '8px 12px', minWidth: '120px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                   <span style={{ fontSize: '10px', color: c.texto2 }}>MIN {t.minuto}</span>
@@ -258,37 +331,88 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
                 <div style={{ fontSize: '11px', fontWeight: 800, color: c.amarelo, marginBottom: '2px' }}>{t.mercado}</div>
                 <div style={{ fontSize: '20px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
                 <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '10px', color: c.texto2, marginTop: '3px' }}>{t.motivo.split('|')[0]}</div>
                 <div style={{ fontSize: '10px', color: c.texto2, marginTop: '2px' }}>{t.motivo.split('|')[0]}</div>
               </div>
             ))}
           </div>
-@@ -379,48 +397,48 @@
+          <div style={{ fontSize: '11px', color: c.texto2, marginTop: '10px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
+        </div>
+      )}
+
+      {/* GRADE */}
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: '11px' }}>
+          <thead>
+            {/* % por coluna */}
+            <tr>
+              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '3px 5px', color: c.verdeClaro, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, minWidth: '24px' }}>H</th>
+              {colStats.map(cs => (
+                <th key={cs.col} style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 3px', textAlign: 'center', minWidth: '42px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{cs.pct}%</div>
+                  <div style={{ fontSize: '9px', color: c.texto2 }}>{cs.total}</div>
+                </th>
+              ))}
+              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 5px', color: c.texto2, fontSize: '9px', minWidth: '60px', textAlign: 'center' }}>% | GOLS</th>
+            </tr>
+
+            {/* IA Tendência */}
+            {mostrarIA && (
+              <tr>
+                <th style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '2px 4px', color: c.azul, fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, height: '24px' }}>IA T{tipoIA}</th>
+                {cols.map(col => {
+                  const t = tendencias.find(t => t.minuto === col.replace('tempo', ''))
+                  return (
+                    <td key={col} title={t?.motivo} style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '1px 2px', textAlign: 'center', height: '24px' }}>
+                      {t && temFiltro ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: c.azul, lineHeight: '1.2' }}>{t.probabilidade}%</span>
+                          <span style={{ fontSize: '9px', color: c.verdeClaro, lineHeight: '1.2' }}>{t.confianca}%</span>
+                        </div>
+                      ) : t ? (
+                        <span style={{ fontSize: '8px', color: c.texto2, fontWeight: 600 }}>{t.mercado}</span>
+                      ) : <span style={{ color: c.borda }}>—</span>}
+                    </td>
+                  )
+                })}
+                <td style={{ background: '#071020', border: `1px solid ${c.borda}`, height: '24px' }} />
+              </tr>
+            )}
+
+            {/* Minutos */}
+            <tr>
+              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 5px', color: c.texto2, fontSize: '9px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
+              {cols.map(col => (
+                <th key={col} style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 3px', color: c.texto2, fontSize: '9px', textAlign: 'center' }}>
+                  {col.replace('tempo', '')}
+                </th>
+              ))}
+              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 5px', color: c.texto2, fontSize: '9px', textAlign: 'center' }}>% | G</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {linhas.map((linha, idx) => {
               const ls = linhaStats[idx]
               return (
                 <tr key={idx}>
-                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 8px', color: c.verdeClaro, fontWeight: 700, fontSize: '12px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace' }}>
-                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 6px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '24px' }}>
-                    {String(idx).padStart(2, '0')}
+                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 4px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '22px' }}>
+                    {String((horaAtual - idx + 24) % 24).padStart(2, '0')}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     return (
-                      <td key={col} style={{ padding: '2px 3px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center' }}>
-                      <td key={col} style={{ padding: '1px 2px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center', height: '24px' }}>
+                      <td key={col} style={{ padding: '1px 2px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center', height: '22px' }}>
                         {p ? (
                           <span style={{
-                            display: 'inline-block', padding: '2px 4px', borderRadius: '3px',
-                            display: 'inline-block', padding: '1px 3px', borderRadius: '2px',
-                            fontWeight: 700, fontSize: '11px', fontFamily: 'monospace',
+                            display: 'inline-block', padding: '1px 2px', borderRadius: '2px',
+                            fontWeight: 700, fontSize: '10px', fontFamily: 'monospace',
                             background: isGreen ? c.verde : c.vermelho,
-                            color: '#fff', minWidth: '36px', textAlign: 'center',
-                            color: '#fff', minWidth: '34px', textAlign: 'center',
+                            color: '#fff', minWidth: '30px', textAlign: 'center',
                           }}>
                             {p.texto}
                           </span>
-                        ) : <span style={{ color: c.borda, fontSize: '10px' }}>—</span>}
+                        ) : <span style={{ color: c.borda, fontSize: '9px' }}>—</span>}
                       </td>
                     )
                   })}
