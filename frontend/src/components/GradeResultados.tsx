@@ -224,6 +224,21 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
 
+  // Calcular hora da próxima partida por minuto
+  const agora = new Date()
+  const horaAtual = agora.getHours()
+  const minAtual = agora.getMinutes()
+
+  function proximaHora(minuto: string): string {
+    const minNum = parseInt(minuto)
+    // Próxima ocorrência desse minuto
+    let h = horaAtual
+    let m = minAtual
+    // Avança até o próximo minuto correspondente
+    if (minNum <= m) h = (h + 1) % 24
+    return `${String(h).padStart(2, '0')}:${String(minNum).padStart(2, '0')}`
+  }
+
   // Melhores entradas
   const melhores = tendencias
     .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
@@ -310,12 +325,15 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '10px 14px', minWidth: '130px' }}>
-                <div style={{ fontSize: '10px', color: c.texto2, marginBottom: '2px' }}>MIN {t.minuto}</div>
-                <div style={{ fontSize: '12px', fontWeight: 800, color: c.amarelo, marginBottom: '4px' }}>{t.mercado}</div>
-                <div style={{ fontSize: '22px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
+              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '8px 12px', minWidth: '120px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <span style={{ fontSize: '10px', color: c.texto2 }}>MIN {t.minuto}</span>
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: c.amarelo }}>→ {proximaHora(t.minuto)}</span>
+                </div>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: c.amarelo, marginBottom: '2px' }}>{t.mercado}</div>
+                <div style={{ fontSize: '20px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
                 <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '10px', color: c.texto2, marginTop: '3px' }}>{t.motivo.split('|')[0]}</div>
+                <div style={{ fontSize: '10px', color: c.texto2, marginTop: '2px' }}>{t.motivo.split('|')[0]}</div>
               </div>
             ))}
           </div>
@@ -379,20 +397,20 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
               const ls = linhaStats[idx]
               return (
                 <tr key={idx}>
-                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 8px', color: c.verdeClaro, fontWeight: 700, fontSize: '12px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace' }}>
+                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 6px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '24px' }}>
                     {String(idx).padStart(2, '0')}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     return (
-                      <td key={col} style={{ padding: '2px 3px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center' }}>
+                      <td key={col} style={{ padding: '1px 2px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center', height: '24px' }}>
                         {p ? (
                           <span style={{
-                            display: 'inline-block', padding: '2px 4px', borderRadius: '3px',
+                            display: 'inline-block', padding: '1px 3px', borderRadius: '2px',
                             fontWeight: 700, fontSize: '11px', fontFamily: 'monospace',
                             background: isGreen ? c.verde : c.vermelho,
-                            color: '#fff', minWidth: '36px', textAlign: 'center',
+                            color: '#fff', minWidth: '34px', textAlign: 'center',
                           }}>
                             {p.texto}
                           </span>
