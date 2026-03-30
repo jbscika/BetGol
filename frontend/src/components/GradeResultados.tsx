@@ -341,52 +341,52 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
       {/* GRADE */}
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', fontSize: '12px' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: '11px' }}>
           <thead>
             {/* % por coluna */}
             <tr>
-              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '5px 8px', color: c.verdeClaro, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, minWidth: '28px' }}>H</th>
+              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '3px 5px', color: c.verdeClaro, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, minWidth: '24px' }}>H</th>
               {colStats.map(cs => (
-                <th key={cs.col} style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '4px 5px', textAlign: 'center', minWidth: '52px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{cs.pct}%</div>
-                  <div style={{ fontSize: '10px', color: c.texto2 }}>{cs.total}</div>
+                <th key={cs.col} style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 3px', textAlign: 'center', minWidth: '42px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: cs.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{cs.pct}%</div>
+                  <div style={{ fontSize: '9px', color: c.texto2 }}>{cs.total}</div>
                 </th>
               ))}
-              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '4px 8px', color: c.texto2, fontSize: '10px', minWidth: '72px', textAlign: 'center' }}>% | GOLS</th>
+              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 5px', color: c.texto2, fontSize: '9px', minWidth: '60px', textAlign: 'center' }}>% | GOLS</th>
             </tr>
 
-            {/* IA Tendência — só mostra prob/conf quando filtro ativo */}
+            {/* IA Tendência */}
             {mostrarIA && (
               <tr>
-                <th style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '2px 6px', color: c.azul, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, height: '28px' }}>IA T{tipoIA}</th>
+                <th style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '2px 4px', color: c.azul, fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, height: '24px' }}>IA T{tipoIA}</th>
                 {cols.map(col => {
                   const t = tendencias.find(t => t.minuto === col.replace('tempo', ''))
                   return (
-                    <td key={col} title={t?.motivo} style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '1px 2px', textAlign: 'center', height: '28px' }}>
+                    <td key={col} title={t?.motivo} style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '1px 2px', textAlign: 'center', height: '24px' }}>
                       {t && temFiltro ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <span style={{ fontSize: '10px', fontWeight: 800, color: c.azul, lineHeight: '1.2' }}>{t.probabilidade}%</span>
                           <span style={{ fontSize: '9px', color: c.verdeClaro, lineHeight: '1.2' }}>{t.confianca}%</span>
                         </div>
                       ) : t ? (
-                        <span style={{ fontSize: '9px', color: c.texto2, fontWeight: 600 }}>{t.mercado}</span>
+                        <span style={{ fontSize: '8px', color: c.texto2, fontWeight: 600 }}>{t.mercado}</span>
                       ) : <span style={{ color: c.borda }}>—</span>}
                     </td>
                   )
                 })}
-                <td style={{ background: '#071020', border: `1px solid ${c.borda}`, height: '28px' }} />
+                <td style={{ background: '#071020', border: `1px solid ${c.borda}`, height: '24px' }} />
               </tr>
             )}
 
             {/* Minutos */}
             <tr>
-              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '5px 8px', color: c.texto2, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
+              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 5px', color: c.texto2, fontSize: '9px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
               {cols.map(col => (
-                <th key={col} style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '5px 5px', color: c.texto2, fontSize: '10px', textAlign: 'center' }}>
+                <th key={col} style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 3px', color: c.texto2, fontSize: '9px', textAlign: 'center' }}>
                   {col.replace('tempo', '')}
                 </th>
               ))}
-              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '5px 8px', color: c.texto2, fontSize: '10px', textAlign: 'center' }}>% | G</th>
+              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 5px', color: c.texto2, fontSize: '9px', textAlign: 'center' }}>% | G</th>
             </tr>
           </thead>
 
@@ -395,24 +395,24 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
               const ls = linhaStats[idx]
               return (
                 <tr key={idx}>
-                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 6px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '24px' }}>
+                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 4px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '22px' }}>
                     {String((horaAtual - idx + 24) % 24).padStart(2, '0')}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     return (
-                      <td key={col} style={{ padding: '1px 2px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center', height: '24px' }}>
+                      <td key={col} style={{ padding: '1px 2px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center', height: '22px' }}>
                         {p ? (
                           <span style={{
-                            display: 'inline-block', padding: '1px 3px', borderRadius: '2px',
-                            fontWeight: 700, fontSize: '11px', fontFamily: 'monospace',
+                            display: 'inline-block', padding: '1px 2px', borderRadius: '2px',
+                            fontWeight: 700, fontSize: '10px', fontFamily: 'monospace',
                             background: isGreen ? c.verde : c.vermelho,
-                            color: '#fff', minWidth: '34px', textAlign: 'center',
+                            color: '#fff', minWidth: '30px', textAlign: 'center',
                           }}>
                             {p.texto}
                           </span>
-                        ) : <span style={{ color: c.borda, fontSize: '10px' }}>—</span>}
+                        ) : <span style={{ color: c.borda, fontSize: '9px' }}>—</span>}
                       </td>
                     )
                   })}
