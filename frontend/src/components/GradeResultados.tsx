@@ -314,28 +314,27 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
       {/* MELHORES ENTRADAS */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: '#071a0f', border: `2px solid ${c.verdeClaro}`, borderRadius: '8px', padding: '14px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.verdeClaro }} />
-            <span style={{ fontSize: '12px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '2px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
-            <span style={{ fontSize: '11px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
-            {liga && <span style={{ fontSize: '11px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
+        <div style={{ background: '#071a0f', border: `1px solid ${c.verdeClaro}`, borderRadius: '6px', padding: '8px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: c.verdeClaro }} />
+            <span style={{ fontSize: '11px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '1px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
+            <span style={{ fontSize: '10px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
+            {liga && <span style={{ fontSize: '10px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '3px', padding: '1px 6px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '6px', padding: '8px 12px', minWidth: '120px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '10px', color: c.texto2 }}>MIN {t.minuto}</span>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: c.amarelo }}>→ {proximaHora(t.minuto)}</span>
+              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '4px', padding: '5px 10px', minWidth: '100px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
+                  <span style={{ fontSize: '9px', color: c.texto2 }}>MIN {t.minuto}</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: c.amarelo }}>→ {proximaHora(t.minuto)}</span>
                 </div>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: c.amarelo, marginBottom: '2px' }}>{t.mercado}</div>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
-                <div style={{ fontSize: '10px', color: c.verdeClaro, marginTop: '2px', fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '10px', color: c.texto2, marginTop: '2px' }}>{t.motivo.split('|')[0]}</div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: c.amarelo }}>{t.mercado}</div>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '9px', color: c.verdeClaro, fontWeight: 700 }}>Conf: {t.confianca}%</div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '11px', color: c.texto2, marginTop: '10px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
+          <div style={{ fontSize: '10px', color: c.texto2, marginTop: '6px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
         </div>
       )}
 
@@ -352,7 +351,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
                   <div style={{ fontSize: '9px', color: c.texto2 }}>{cs.total}</div>
                 </th>
               ))}
-              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 5px', color: c.texto2, fontSize: '9px', minWidth: '60px', textAlign: 'center' }}>% | GOLS</th>
+              <th style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 3px', color: c.texto2, fontSize: '9px', minWidth: '42px', textAlign: 'center' }}>% | G</th>
             </tr>
 
             {/* IA Tendência */}
@@ -386,7 +385,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
                   {col.replace('tempo', '')}
                 </th>
               ))}
-              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 5px', color: c.texto2, fontSize: '9px', textAlign: 'center' }}>% | G</th>
+              <th style={{ background: c.bg3, border: `1px solid ${c.borda}`, padding: '3px 3px', color: c.texto2, fontSize: '9px', textAlign: 'center', minWidth: '42px' }}>% | G</th>
             </tr>
           </thead>
 
@@ -416,9 +415,9 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
                       </td>
                     )
                   })}
-                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '2px 8px', textAlign: 'center' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: ls.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{ls.pct}%</span>
-                    <span style={{ fontSize: '10px', color: c.texto2, marginLeft: '4px' }}>{ls.totalGols}g</span>
+                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 3px', textAlign: 'center', minWidth: '42px', height: '22px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: ls.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{ls.pct}%</span>
+                    <span style={{ fontSize: '9px', color: c.texto2, marginLeft: '2px' }}>{ls.totalGols}g</span>
                   </td>
                 </tr>
               )
