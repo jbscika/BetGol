@@ -4,6 +4,7 @@ import { Partida } from '../pages/Dashboard'
 interface Props {
   linhas: Partida[]
   colunas: string[]
+  horas?: string[]
   liga?: string
 }
 
@@ -172,7 +173,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   return resultado
 }
 
-export default function GradeResultados({ linhas, colunas, liga }: Props) {
+export default function GradeResultados({ linhas, colunas, horas, liga }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
   const [tipoIA, setTipoIA] = useState<1 | 2 | 3>(1)
@@ -224,17 +225,19 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
 
-  // Calcular hora da próxima partida
-  const agora = new Date()
-  const horaAtual = agora.getHours()
-  const minAtual = agora.getMinutes()
+  // Hora atual da Bet365 (vem da API no campo horas[0])
+  const horaAtualBet = horas && horas.length > 0 ? parseInt(String(horas[0])) : new Date().getHours()
+  const minAtual = new Date().getMinutes()
 
-  // A linha 0 do topo = hora atual, linha 1 = hora anterior, etc.
-  // Próxima partida = hora atual se ainda não passou o minuto, senão próxima hora
   function proximaHora(minuto: string): string {
     const minNum = parseInt(minuto)
-    const h = minNum > minAtual ? horaAtual : (horaAtual + 1) % 24
+    const h = minNum > minAtual ? horaAtualBet : (horaAtualBet + 1) % 24
     return `${String(h).padStart(2, '0')}:${String(minNum).padStart(2, '0')}`
+  }
+
+  function horaLinha(idx: number): string {
+    if (horas && horas.length > idx) return String(horas[idx]).padStart(2, '0')
+    return String((horaAtualBet - idx + 24) % 24).padStart(2, '0')
   }
 
   // Melhores entradas
@@ -392,7 +395,7 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
               return (
                 <tr key={idx}>
                   <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 4px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '22px' }}>
-                    {String((horaAtual - idx + 24) % 24).padStart(2, '0')}
+                    {horaLinha(idx)}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
