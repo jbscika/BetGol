@@ -314,33 +314,30 @@ export default function GradeResultados({ linhas, colunas, liga }: Props) {
 
       {/* MELHORES ENTRADAS */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: '#071a0f', border: `1px solid ${c.verdeClaro}`, borderRadius: '6px', padding: '8px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+        <div style={{ background: '#071a0f', border: `1px solid ${c.verdeClaro}`, borderRadius: '6px', padding: '6px 10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: c.verdeClaro }} />
             <span style={{ fontSize: '11px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '1px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
             <span style={{ fontSize: '10px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
             {liga && <span style={{ fontSize: '10px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '3px', padding: '1px 6px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '4px', padding: '5px 10px', minWidth: '100px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '1px' }}>
-                  <span style={{ fontSize: '9px', color: c.texto2 }}>MIN {t.minuto}</span>
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: c.amarelo }}>→ {proximaHora(t.minuto)}</span>
-                </div>
+              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '4px', padding: '4px 8px', flex: '1', minWidth: '90px' }}>
+                <div style={{ fontSize: '9px', color: c.texto2 }}>MIN {t.minuto} <span style={{ color: c.amarelo, fontWeight: 700 }}>→ {proximaHora(t.minuto)}</span></div>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: c.amarelo }}>{t.mercado}</div>
-                <div style={{ fontSize: '16px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1 }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1.1 }}>{t.probabilidade}%</div>
                 <div style={{ fontSize: '9px', color: c.verdeClaro, fontWeight: 700 }}>Conf: {t.confianca}%</div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '10px', color: c.texto2, marginTop: '6px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
+          <div style={{ fontSize: '9px', color: c.texto2, marginTop: '4px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
         </div>
       )}
 
       {/* GRADE */}
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', fontSize: '11px' }}>
+      <div style={{ overflowX: 'auto', width: '100%' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: '11px', width: '100%' }}>
           <thead>
             {/* % por coluna */}
             <tr>
