@@ -217,10 +217,10 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
 
   const c = {
-    bg2: '#ffffff', bg3: '#f5f5f5', bg4: '#e8e8e8', borda: '#d0d0d0',
+    bg2: '#ffffff', bg3: '#f0f0f0', bg4: '#e0e0e0', borda: '#cccccc',
     verde: '#1a7a3a', vermelho: '#c0392b',
     verdeClaro: '#1a7a3a', vermelhoClaro: '#c0392b',
-    texto: '#111111', texto2: '#444444', amarelo: '#b8600c', azul: '#1565c0',
+    texto: '#111111', texto2: '#333333', amarelo: '#b8600c', azul: '#1565c0',
   }
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
@@ -317,24 +317,24 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
 
       {/* MELHORES ENTRADAS */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: '#071a0f', border: `1px solid ${c.verdeClaro}`, borderRadius: '6px', padding: '6px 10px' }}>
+        <div style={{ background: '#1a7a3a', border: `1px solid #1a7a3a`, borderRadius: '6px', padding: '6px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: c.verdeClaro }} />
-            <span style={{ fontSize: '11px', fontWeight: 800, color: c.verdeClaro, letterSpacing: '1px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
-            <span style={{ fontSize: '10px', color: c.texto2 }}>IA TIPO {tipoIA}</span>
-            {liga && <span style={{ fontSize: '10px', background: '#2979ff22', color: c.azul, border: `1px solid ${c.azul}44`, borderRadius: '3px', padding: '1px 6px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#fff', letterSpacing: '1px' }}>MELHORES ENTRADAS — PRÓXIMA PARTIDA</span>
+            <span style={{ fontSize: '10px', color: '#ccffcc' }}>IA TIPO {tipoIA}</span>
+            {liga && <span style={{ fontSize: '10px', background: '#ffffff33', color: '#fff', border: `1px solid #ffffff44`, borderRadius: '3px', padding: '1px 6px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
           </div>
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#0a2a18', border: `1px solid ${c.verdeClaro}44`, borderRadius: '4px', padding: '4px 8px', flex: '1', minWidth: '90px' }}>
-                <div style={{ fontSize: '9px', color: c.texto2 }}>MIN {t.minuto} <span style={{ color: c.amarelo, fontWeight: 700 }}>→ {proximaHora(t.minuto)}</span></div>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: c.amarelo }}>{t.mercado}</div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: c.azul, fontFamily: 'monospace', lineHeight: 1.1 }}>{t.probabilidade}%</div>
-                <div style={{ fontSize: '9px', color: c.verdeClaro, fontWeight: 700 }}>Conf: {t.confianca}%</div>
+              <div key={i} style={{ background: '#ffffff', border: `1px solid #cccccc`, borderRadius: '4px', padding: '4px 8px', flex: '1', minWidth: '90px' }}>
+                <div style={{ fontSize: '9px', color: '#333333' }}>MIN {t.minuto} <span style={{ color: '#1565c0', fontWeight: 700 }}>→ {proximaHora(t.minuto)}</span></div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#111111' }}>{t.mercado}</div>
+                <div style={{ fontSize: '15px', fontWeight: 800, color: '#1565c0', fontFamily: 'monospace', lineHeight: 1.1 }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '9px', color: '#1a7a3a', fontWeight: 700 }}>Conf: {t.confianca}%</div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '9px', color: c.texto2, marginTop: '4px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
+          <div style={{ fontSize: '9px', color: '#ccffcc', marginTop: '4px' }}>⚠️ Aposte apenas quando prob ≥ 65% E confiança ≥ 70%</div>
         </div>
       )}
 
@@ -357,23 +357,23 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
             {/* IA Tendência */}
             {mostrarIA && (
               <tr>
-                <th style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '2px 4px', color: c.azul, fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, height: '24px' }}>IA T{tipoIA}</th>
+                <th style={{ background: '#1a7a3a', border: `1px solid #cccccc`, padding: '2px 4px', color: '#fff', fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, height: '24px' }}>IA T{tipoIA}</th>
                 {cols.map(col => {
                   const t = tendencias.find(t => t.minuto === col.replace('tempo', ''))
                   return (
-                    <td key={col} title={t?.motivo} style={{ background: '#071020', border: `1px solid ${c.borda}`, padding: '1px 2px', textAlign: 'center', height: '24px' }}>
+                    <td key={col} title={t?.motivo} style={{ background: '#1a7a3a', border: `1px solid #cccccc`, padding: '1px 2px', textAlign: 'center', height: '24px' }}>
                       {t && temFiltro ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 800, color: c.azul, lineHeight: '1.2' }}>{t.probabilidade}%</span>
-                          <span style={{ fontSize: '9px', color: c.verdeClaro, lineHeight: '1.2' }}>{t.confianca}%</span>
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', lineHeight: '1.2', background: '#fff', borderRadius: '2px', padding: '0 2px' }}>{t.probabilidade}%</span>
+                          <span style={{ fontSize: '9px', color: '#fff', lineHeight: '1.2' }}>{t.confianca}%</span>
                         </div>
                       ) : t ? (
                         <span style={{ fontSize: '8px', color: '#fff', fontWeight: 600 }}>{t.mercado}</span>
-                      ) : <span style={{ color: c.borda }}>—</span>}
+                      ) : <span style={{ color: '#ffffff44' }}>—</span>}
                     </td>
                   )
                 })}
-                <td style={{ background: '#071020', border: `1px solid ${c.borda}`, height: '24px' }} />
+                <td style={{ background: '#1a7a3a', border: `1px solid #cccccc`, height: '24px' }} />
               </tr>
             )}
 
