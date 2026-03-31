@@ -360,14 +360,14 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
             {/* IA Tendência */}
             {mostrarIA && (
               <tr>
-                <th style={{ background: '#1a7a3a', border: `1px solid #cccccc`, padding: '2px 4px', color: '#fff', fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, height: '24px' }}>IA T{tipoIA}</th>
+                <th style={{ background: '#1565c0', border: `1px solid #cccccc`, padding: '2px 4px', color: '#fff', fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, height: '24px' }}>IA T{tipoIA}</th>
                 {cols.map(col => {
                   const t = tendencias.find(t => t.minuto === col.replace('tempo', ''))
                   return (
-                    <td key={col} title={t?.motivo} style={{ background: '#1a7a3a', border: `1px solid #cccccc`, padding: '1px 2px', textAlign: 'center', height: '24px' }}>
+                    <td key={col} title={t?.motivo} style={{ background: '#1565c0', border: `1px solid #cccccc`, padding: '1px 2px', textAlign: 'center', height: '24px' }}>
                       {t && temFiltro ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', lineHeight: '1.2', background: '#fff', borderRadius: '2px', padding: '0 2px' }}>{t.probabilidade}%</span>
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#fff', lineHeight: '1.2', background: '#1565c0', borderRadius: '2px', padding: '0 2px' }}>{t.probabilidade}%</span>
                           <span style={{ fontSize: '9px', color: '#fff', lineHeight: '1.2' }}>{t.confianca}%</span>
                         </div>
                       ) : t ? (
@@ -376,7 +376,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
                     </td>
                   )
                 })}
-                <td style={{ background: '#1a7a3a', border: `1px solid #cccccc`, height: '24px' }} />
+                <td style={{ background: '#1565c0', border: `1px solid #cccccc`, height: '24px' }} />
               </tr>
             )}
 
