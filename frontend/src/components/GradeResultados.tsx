@@ -393,34 +393,35 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
           </thead>
 
           <tbody>
-            {linhas.map((linha, idx) => {
+            {linhas.slice(0, 20).map((linha, idx) => {
               const ls = linhaStats[idx]
               return (
                 <tr key={idx}>
-                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 4px', color: c.verdeClaro, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '22px' }}>
+                  <td style={{ background: '#f0f0f0', border: `1px solid #cccccc`, padding: '0 4px', color: '#1a7a3a', fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '20px' }}>
                     {horaLinha(idx)}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     return (
-                      <td key={col} style={{ padding: '1px 2px', border: `1px solid rgba(255,255,255,0.03)`, textAlign: 'center', height: '22px' }}>
+                      <td key={col} style={{ padding: '0', border: `1px solid #cccccc`, textAlign: 'center', height: '20px' }}>
                         {p ? (
                           <span style={{
-                            display: 'inline-block', padding: '1px 2px', borderRadius: '2px',
-                            fontWeight: 700, fontSize: '10px', fontFamily: 'monospace',
-                            background: isGreen ? c.verde : c.vermelho,
-                            color: '#fff', minWidth: '30px', textAlign: 'center',
+                            display: 'block', width: '100%', height: '100%',
+                            lineHeight: '20px',
+                            fontWeight: 700, fontSize: '11px', fontFamily: 'monospace',
+                            background: isGreen ? '#1a7a3a' : '#c0392b',
+                            color: '#fff', textAlign: 'center',
                           }}>
                             {p.texto}
                           </span>
-                        ) : <span style={{ color: c.borda, fontSize: '9px' }}>—</span>}
+                        ) : <span style={{ color: '#cccccc', fontSize: '9px' }}>—</span>}
                       </td>
                     )
                   })}
-                  <td style={{ background: c.bg2, border: `1px solid ${c.borda}`, padding: '1px 3px', textAlign: 'center', minWidth: '42px', height: '22px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: ls.pct >= 50 ? c.verdeClaro : c.vermelhoClaro }}>{ls.pct}%</span>
-                    <span style={{ fontSize: '9px', color: c.texto2, marginLeft: '2px' }}>{ls.totalGols}g</span>
+                  <td style={{ background: '#f0f0f0', border: `1px solid #cccccc`, padding: '0 4px', textAlign: 'center', height: '20px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: ls.pct >= 50 ? '#1a7a3a' : '#c0392b' }}>{ls.pct}%</span>
+                    <span style={{ fontSize: '9px', color: '#333', marginLeft: '2px' }}>{ls.totalGols}g</span>
                   </td>
                 </tr>
               )
