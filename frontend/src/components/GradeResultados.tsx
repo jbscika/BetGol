@@ -6,6 +6,8 @@ interface Props {
   colunas: string[]
   horas?: string[]
   liga?: string
+  ligas?: string[]
+  onTrocarLiga?: (liga: string) => void
 }
 
 interface PlacarInfo {
@@ -176,7 +178,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   return resultado
 }
 
-export default function GradeResultados({ linhas, colunas, horas, liga }: Props) {
+export default function GradeResultados({ linhas, colunas, horas, liga, ligas, onTrocarLiga }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
   const [tipoIA, setTipoIA] = useState<1 | 2 | 3>(1)
@@ -294,7 +296,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
 
       {/* STATS */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           {[
             { lbl: 'MEDIA GREENS', val: `${stats20.pct}%`, cor: '#1a7a3a' },
             { lbl: 'MÉDIA GOLS', val: String(stats20.mediaGols), cor: '#b8600c' },
@@ -304,6 +306,28 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
               <div style={{ fontSize: '10px', color: '#aaccff', letterSpacing: '2px' }}>{s.lbl}</div>
               <div style={{ fontSize: '22px', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>{s.val}</div>
             </div>
+          ))}
+
+          {/* LIGAS */}
+          {ligas && ligas.map(l => (
+            <button
+              key={l}
+              onClick={() => onTrocarLiga && onTrocarLiga(l)}
+              style={{
+                padding: '8px 16px',
+                background: liga === l ? '#1a7a3a' : '#f0f0f0',
+                border: `1px solid ${liga === l ? '#1a7a3a' : '#cccccc'}`,
+                borderRadius: '6px',
+                color: liga === l ? '#fff' : '#444',
+                fontWeight: 700,
+                fontSize: '12px',
+                letterSpacing: '1px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+            >
+              {l.toUpperCase()}
+            </button>
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
