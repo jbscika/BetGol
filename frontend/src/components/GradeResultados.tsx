@@ -185,17 +185,9 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
 
-  // Stats por coluna
-  const colStats = useMemo(() => cols.map(col => {
-    let total = 0, greens = 0, totalGols = 0
-    linhas.forEach(linha => {
-      const p = extrairPlacar(linha[col] as string)
-      if (p) { total++; totalGols += p.gols; if (!temFiltro || passaFiltro(p, filtrosAtivos)) if (p.over25) greens++ }
-    })
-    return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
-  }), [linhas, colunas, filtrosAtivos])
+  // Stats pelas últimas 20 linhas
+  const linhas20 = linhas.slice(0, 20)
 
-  // Stats por linha
   const linhaStats = useMemo(() => linhas.map((linha, idx) => {
     let total = 0, greens = 0, totalGols = 0
     cols.forEach(col => {
@@ -205,16 +197,64 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
     return { idx, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
   }), [linhas, colunas])
 
-  // IA Tendência — recalcula quando linhas, colunas, tipoIA ou filtro mudam
+  // Stats por coluna (últimas 20 linhas)
+  const colStats = useMemo(() => cols.map(col => {
+    let total = 0, greens = 0
+    linhas20.forEach(linha => {
+      const p = extrairPlacar(linha[col] as string)
+      if (p) { total++; if (!temFiltro || passaFiltro(p, filtrosAtivos)) if (p.over25) greens++ }
+    })
+    return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
+  }), [linhas, colunas, filtrosAtivos])
+
+  // IA Tendência
   const tendencias = useMemo(() => {
     if (!mostrarIA || linhas.length < 5) return []
     return calcularIA(linhas, cols, tipoIA, filtrosAtivos)
   }, [linhas, colunas, tipoIA, mostrarIA, filtrosAtivos])
 
-  const totalP = linhaStats.reduce((s, l) => s + l.total, 0)
-  const totalG = linhaStats.reduce((s, l) => s + l.greens, 0)
-  const pctGeral = totalP > 0 ? Math.round(totalG / totalP * 100) : 0
-  const mediaGols = totalP > 0 ? Math.round(linhaStats.reduce((s, l) => s + l.totalGols, 0) / totalP * 10) / 10 : 0
+  // Stats globais (últimas 20 linhas)
+  const stats20 = useMemo(() => {
+    let total = 0, greens = 0, totalGols = 0
+    linhas20.forEach(linha => {
+      cols.forEach(col => {
+        const p = extrairPlacar(linha[col] as string)
+        if (p) { total++; totalGols += p.gols; if (p.over25) greens++ }
+      })
+    })
+    return {
+      total,
+      pct: total > 0 ? Math.round(greens / total * 100) : 0,
+      mediaGols: total > 0 ? Math.round(totalGols / total * 10) / 10 : 0,
+    }
+  }, [linhas, colunas])
+
+  // Ranking dos melhores times (últimas 20 linhas)
+  const rankingTimes = useMemo(() => {
+    const times: Record<string, { nome: string; vitorias: number; gols: number; jogos: number; golsSofridos: number }> = {}
+    linhas20.forEach(linha => {
+      cols.forEach(col => {
+        const val = linha[col] as string
+        if (!val) return
+        const partes = val.split('</br>')[0].trim()
+        // Formato: "Time A 2 - 1 Time B"
+        const m = partes.match(/^(.+?)\s+(\d+)\s*-\s*(\d+)\s+(.+)$/)
+        if (!m) return
+        const [, timeA, golsA, golsB, timeB] = m
+        const gA = parseInt(golsA), gB = parseInt(golsB)
+        if (!times[timeA]) times[timeA] = { nome: timeA, vitorias: 0, gols: 0, jogos: 0, golsSofridos: 0 }
+        if (!times[timeB]) times[timeB] = { nome: timeB, vitorias: 0, gols: 0, jogos: 0, golsSofridos: 0 }
+        times[timeA].jogos++; times[timeA].gols += gA; times[timeA].golsSofridos += gB
+        times[timeB].jogos++; times[timeB].gols += gB; times[timeB].golsSofridos += gA
+        if (gA > gB) times[timeA].vitorias++
+        else if (gB > gA) times[timeB].vitorias++
+      })
+    })
+    return Object.values(times)
+      .filter(t => t.jogos >= 3)
+      .sort((a, b) => b.vitorias - a.vitorias || b.gols - a.gols)
+      .slice(0, 8)
+  }, [linhas, colunas])
 
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
@@ -256,13 +296,13 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           {[
-            { lbl: 'MEDIA GREENS', val: `${pctGeral}%`, cor: c.verdeClaro },
-            { lbl: 'MÉDIA GOLS', val: String(mediaGols), cor: c.amarelo },
-            { lbl: 'PARTIDAS', val: String(totalP), cor: c.texto },
+            { lbl: 'MEDIA GREENS', val: `${stats20.pct}%`, cor: '#1a7a3a' },
+            { lbl: 'MÉDIA GOLS', val: String(stats20.mediaGols), cor: '#b8600c' },
+            { lbl: 'PARTIDAS', val: String(stats20.total), cor: '#111111' },
           ].map(s => (
-            <div key={s.lbl} style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '8px 14px' }}>
-              <div style={{ fontSize: '10px', color: c.texto2, letterSpacing: '2px' }}>{s.lbl}</div>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: s.cor, fontFamily: 'monospace' }}>{s.val}</div>
+            <div key={s.lbl} style={{ background: '#1565c0', border: `1px solid #1040a0`, borderRadius: '6px', padding: '8px 14px' }}>
+              <div style={{ fontSize: '10px', color: '#aaccff', letterSpacing: '2px' }}>{s.lbl}</div>
+              <div style={{ fontSize: '22px', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>{s.val}</div>
             </div>
           ))}
         </div>
@@ -432,14 +472,75 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
 
       {/* LEGENDA */}
       {mostrarIA && (
-        <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '6px', padding: '10px 14px', fontSize: '11px', color: c.texto2 }}>
-          <span style={{ color: c.azul, fontWeight: 700 }}>IA TIPO {tipoIA} </span>
-          {tipoIA === 1 && '— Sequência 2h: detecta correções após sequências longas'}
-          {tipoIA === 2 && '— Correlação horária: analisa resultado da hora anterior'}
-          {tipoIA === 3 && '— Avançada: ciclos do algoritmo + padrões compostos'}
-          {!temFiltro && <span style={{ marginLeft: '12px', color: c.amarelo }}>← Selecione um filtro para ver probabilidade e confiança por minuto</span>}
+        <div style={{ background: '#f0f0f0', border: `1px solid #cccccc`, borderRadius: '6px', padding: '8px 14px', fontSize: '11px', color: '#333' }}>
+          <span style={{ color: '#1565c0', fontWeight: 700 }}>IA TIPO {tipoIA} </span>
+          {tipoIA === 1 && '— Análise das últimas 3 linhas (60 partidas)'}
+          {tipoIA === 2 && '— Análise das últimas 5 linhas (100 partidas)'}
+          {tipoIA === 3 && '— Análise das últimas 8 linhas (160 partidas)'}
+          {!temFiltro && <span style={{ marginLeft: '12px', color: '#b8600c' }}>← Selecione um filtro para ver probabilidade por minuto</span>}
         </div>
       )}
+
+      {/* RANKING DOS MELHORES TIMES */}
+      {rankingTimes.length > 0 && (
+        <div style={{ background: '#ffffff', border: `1px solid #cccccc`, borderRadius: '8px', padding: '12px 14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '10px' }}>
+            RANKING DOS MELHORES TIMES — ÚLTIMAS 20H
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ background: '#1565c0', color: '#fff' }}>
+                {['#','TIME','J','V','GOLS','GM','GS','%V'].map(h => (
+                  <th key={h} style={{ padding: '5px 8px', textAlign: h === 'TIME' ? 'left' : 'center', fontWeight: 600 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rankingTimes.map((t, i) => (
+                <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#ffffff', borderBottom: '1px solid #eeeeee' }}>
+                  <td style={{ padding: '4px 8px', fontWeight: 700, color: i < 3 ? '#1565c0' : '#333', textAlign: 'center' }}>{i + 1}</td>
+                  <td style={{ padding: '4px 8px', fontWeight: 600, color: '#111' }}>{t.nome}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#333' }}>{t.jogos}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 700, color: '#1a7a3a' }}>{t.vitorias}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#333' }}>{t.gols + t.golsSofridos}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#1a7a3a', fontWeight: 700 }}>{t.gols}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#c0392b' }}>{t.golsSofridos}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 700, color: '#1565c0' }}>{Math.round(t.vitorias / t.jogos * 100)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* CONFRONTOS FUTUROS */}
+      {linhas.length > 0 && (() => {
+        const proxima = linhas[0]
+        const confrontos: { minuto: string; times: string }[] = []
+        cols.forEach(col => {
+          const val = proxima[col] as string
+          if (!val) return
+          const linha = val.split('</br>')[0].trim()
+          const m = linha.match(/^(.+?)\s+\d+\s*-\s*\d+\s+(.+)$/)
+          if (m) confrontos.push({ minuto: col.replace('tempo', ''), times: `${m[1]} vs ${m[2]}` })
+        })
+        if (confrontos.length === 0) return null
+        return (
+          <div style={{ background: '#ffffff', border: `1px solid #cccccc`, borderRadius: '8px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '10px' }}>
+              CONFRONTOS FUTUROS — PRÓXIMA HORA
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {confrontos.map((cf, i) => (
+                <div key={i} style={{ background: '#f0f0f0', border: '1px solid #cccccc', borderRadius: '4px', padding: '4px 10px', fontSize: '11px' }}>
+                  <span style={{ color: '#1565c0', fontWeight: 700 }}>MIN {cf.minuto}</span>
+                  <span style={{ color: '#333', marginLeft: '6px' }}>{cf.times}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
