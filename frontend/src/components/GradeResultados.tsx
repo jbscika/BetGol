@@ -50,95 +50,92 @@ function passaFiltro(p: PlacarInfo, f: typeof FILTRO_VAZIO): boolean {
 }
 
 function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtroAtivo: typeof FILTRO_VAZIO): Tendencia[] {
-  const horas = Math.min(linhas.length, 48)
   const resultado: Tendencia[] = []
   const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
 
-  // Pré-calcular histórico de todas as colunas para correlação entre minutos
-  const histMap: Record<string, (PlacarInfo | null)[]> = {}
-  colunas.forEach(col => {
-    histMap[col] = []
-    for (let i = 0; i < horas; i++) histMap[col].push(extrairPlacar(linhas[i]?.[col] as string))
-  })
+  // Janela de linhas por tipo
+  const janela = tipoIA === 1 ? 3 : tipoIA === 2 ? 5 : 8
+  const linhasJanela = linhas.slice(0, janela)
+  const todasLinhas = linhas.slice(0, Math.min(linhas.length, 48))
 
   colunas.forEach((col, colIdx) => {
-    const hist = histMap[col]
-    const validos = hist.filter(Boolean) as PlacarInfo[]
-    if (validos.length < 5) return
+    // Histórico completo para calcular % base
+    const histCompleto: (PlacarInfo | null)[] = todasLinhas.map(l => extrairPlacar(l[col] as string))
+    const validosCompleto = histCompleto.filter(Boolean) as PlacarInfo[]
+    if (validosCompleto.length < 5) return
+
+    // Histórico da janela (linhas recentes)
+    const histJanela: (PlacarInfo | null)[] = linhasJanela.map(l => extrairPlacar(l[col] as string))
+    const validosJanela = histJanela.filter(Boolean) as PlacarInfo[]
 
     const min = col.replace('tempo', '')
-    const n = validos.length
+    const n = validosCompleto.length
+    const nJ = validosJanela.length
 
-    const pO15 = Math.round(validos.filter(p => p.over15).length / n * 100)
-    const pO25 = Math.round(validos.filter(p => p.over25).length / n * 100)
-    const pO35 = Math.round(validos.filter(p => p.over35).length / n * 100)
-    const pU25 = 100 - pO25
-    const pAmbas = Math.round(validos.filter(p => p.ambasSim).length / n * 100)
-    const pCasa = Math.round(validos.filter(p => p.casaVence).length / n * 100)
-    const pEmp = Math.round(validos.filter(p => p.empate).length / n * 100)
-    const pFora = Math.round(validos.filter(p => p.foraVence).length / n * 100)
-    const mediaG = Math.round(validos.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
+    // % base (histórico completo)
+    const pO25Base = Math.round(validosCompleto.filter(p => p.over25).length / n * 100)
+    const pO15Base = Math.round(validosCompleto.filter(p => p.over15).length / n * 100)
+    const pO35Base = Math.round(validosCompleto.filter(p => p.over35).length / n * 100)
+    const pAmbasBase = Math.round(validosCompleto.filter(p => p.ambasSim).length / n * 100)
+    const pCasaBase = Math.round(validosCompleto.filter(p => p.casaVence).length / n * 100)
+    const pEmpBase = Math.round(validosCompleto.filter(p => p.empate).length / n * 100)
+    const pForaBase = Math.round(validosCompleto.filter(p => p.foraVence).length / n * 100)
+    const mediaGBase = Math.round(validosCompleto.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
 
-    // Sequência atual
+    // % da janela recente
+    const pO25Jan = nJ > 0 ? Math.round(validosJanela.filter(p => p.over25).length / nJ * 100) : pO25Base
+    const pAmbasJan = nJ > 0 ? Math.round(validosJanela.filter(p => p.ambasSim).length / nJ * 100) : pAmbasBase
+    const mediaGJan = nJ > 0 ? Math.round(validosJanela.reduce((s, p) => s + p.gols, 0) / nJ * 10) / 10 : mediaGBase
+
+    // Sequência atual na janela
     let seq = 0; let dir: boolean | null = null
-    for (const p of hist) {
+    for (const p of histJanela) {
       if (!p) continue
       if (dir === null) { dir = p.over25; seq = 1 }
       else if (p.over25 === dir) seq++
       else break
     }
 
-    // Variação recente (últimas 5 vs histórico)
-    const ult5 = hist.slice(0, 5).filter(Boolean) as PlacarInfo[]
-    const pO25Rec = ult5.length > 0 ? Math.round(ult5.filter(p => p.over25).length / ult5.length * 100) : pO25
-    const varRec = pO25Rec - pO25
+    // Variação: janela vs histórico (indica tendência)
+    const varOver = pO25Jan - pO25Base // positivo = janela mais over que histórico
+    const varAmbas = pAmbasJan - pAmbasBase
+    const varGols = mediaGJan - mediaGBase
 
-    // Correlação com minuto anterior
-    let corrBoost = 0
-    if (colIdx > 0) {
-      const colAnt = colunas[colIdx - 1]
-      const histAnt = histMap[colAnt]
-      let concord = 0, tot = 0
-      for (let i = 0; i < Math.min(hist.length, histAnt.length, 24); i++) {
-        const a = histAnt[i], b = hist[i]
-        if (!a || !b) continue
-        tot++
-        if (!a.over25 && b.over25) concord++ // ant RED → atual GREEN
-      }
-      const pCorr = tot > 0 ? concord / tot : 0
-      if (histAnt[0] && !histAnt[0].over25 && pCorr > 0.5) corrBoost = Math.round(pCorr * 18)
-    }
-
-    // Análise de ciclos
-    let cc = 0; let ant = hist[0]?.over25
-    for (let i = 1; i < Math.min(hist.length, 24); i++) {
-      const p = hist[i]; if (!p) continue
-      if (p.over25 !== ant) { cc++; ant = p.over25 }
-    }
-    const cicloMedio = cc > 0 ? Math.round(24 / cc) : 0
-    const cicloBoost = cicloMedio > 0 && seq >= cicloMedio ? Math.min((seq - cicloMedio + 1) * 10, 25) : 0
-
-    // Boost por tipo de IA
+    // Ajuste baseado na variação e sequência
     let boost = 0
-    if (tipoIA === 1) {
-      boost = seq >= 3 && dir === false ? seq * 8 : seq >= 3 && dir === true ? -(seq * 5) : 0
-    } else if (tipoIA === 2) {
-      boost = corrBoost + (varRec < -10 ? 12 : varRec > 10 ? -8 : 0)
-    } else {
-      boost = cicloBoost + corrBoost + (varRec < -15 ? 15 : varRec > 15 ? -10 : 0)
-      if (mediaG > 3.0) boost += 5
-      if (mediaG < 1.5) boost -= 8
-    }
 
-    const baseOver25 = Math.min(Math.max(pO25 + (dir === false ? Math.abs(boost) : dir === true ? -Math.abs(boost) : boost), 10), 93)
+    // Se janela tem menos over que histórico → over está "devendo" → boost positivo
+    if (varOver < -15) boost += 20
+    else if (varOver < -8) boost += 12
+    else if (varOver > 15) boost -= 15
+    else if (varOver > 8) boost -= 8
+
+    // Sequência de RED na janela → correção esperada
+    if (seq >= janela && dir === false) boost += 15
+    else if (seq >= Math.floor(janela * 0.7) && dir === false) boost += 10
+
+    // Sequência de GREEN na janela → possível reversão
+    if (seq >= janela && dir === true) boost -= 15
+    else if (seq >= Math.floor(janela * 0.7) && dir === true) boost -= 10
+
+    // Média de gols da janela
+    if (varGols > 0.5) boost += 5
+    if (varGols < -0.5) boost -= 5
+
+    // Calcular probabilidade final
+    const baseOver25 = Math.min(Math.max(pO25Base + boost, 10), 93)
 
     let mercadoNome = ''
     let probFinal = 0
     let confiancaFinal = 55
 
     if (temFiltro) {
-      const greens = validos.filter(p => passaFiltro(p, filtroAtivo)).length
-      const pctFiltro = Math.round(greens / n * 100)
+      const greensBase = validosCompleto.filter(p => passaFiltro(p, filtroAtivo)).length
+      const greensJan = validosJanela.filter(p => passaFiltro(p, filtroAtivo)).length
+      const pctBase = Math.round(greensBase / n * 100)
+      const pctJan = nJ > 0 ? Math.round(greensJan / nJ * 100) : pctBase
+      const varFiltro = pctJan - pctBase
+
       const partes = []
       if (filtroAtivo.over) partes.push(`OVER ${filtroAtivo.over}`)
       if (filtroAtivo.under) partes.push(`UNDER ${filtroAtivo.under}`)
@@ -146,27 +143,33 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       if (filtroAtivo.ambas === 'nao') partes.push('AMBAS NÃO')
       if (filtroAtivo.resultado) partes.push(filtroAtivo.resultado.toUpperCase())
       mercadoNome = partes.join(' + ')
-      probFinal = Math.min(Math.max(pctFiltro + (dir === false ? Math.abs(boost) : 0), 10), 93)
-      confiancaFinal = Math.abs(boost) > 15 ? 88 : Math.abs(boost) > 8 ? 78 : Math.abs(probFinal - 50) > 20 ? 70 : 55
+
+      // Se janela tem menos green que histórico → mercado está "devendo"
+      probFinal = Math.min(Math.max(pctBase + (varFiltro < -10 ? 20 : varFiltro < 0 ? 10 : varFiltro > 10 ? -10 : 0), 10), 93)
+      confiancaFinal = Math.abs(varFiltro) > 15 ? 88 : Math.abs(varFiltro) > 8 ? 78 : Math.abs(probFinal - 50) > 20 ? 70 : 55
     } else {
       const opcoes = [
-        { nome: 'OVER 1.5', prob: Math.min(pO15, 95) },
+        { nome: 'OVER 1.5', prob: Math.min(pO15Base, 95) },
         { nome: 'OVER 2.5', prob: baseOver25 },
-        { nome: 'UNDER 2.5', prob: Math.min(100 - baseOver25 + (dir === true ? Math.abs(boost) : 0), 93) },
-        { nome: 'OVER 3.5', prob: Math.min(pO35 + (mediaG > 3 ? 8 : 0), 88) },
-        { nome: 'AMBAS SIM', prob: Math.min(pAmbas + (pAmbas > 55 ? Math.round(Math.abs(boost) / 3) : 0), 92) },
-        { nome: 'CASA', prob: pCasa }, { nome: 'EMPATE', prob: pEmp }, { nome: 'FORA', prob: pFora },
+        { nome: 'UNDER 2.5', prob: Math.min(100 - baseOver25, 93) },
+        { nome: 'OVER 3.5', prob: Math.min(pO35Base + (mediaGJan > 3 ? 8 : 0), 88) },
+        { nome: 'AMBAS SIM', prob: Math.min(pAmbasBase + (varAmbas < -10 ? 15 : 0), 92) },
+        { nome: 'CASA', prob: pCasaBase },
+        { nome: 'EMPATE', prob: pEmpBase },
+        { nome: 'FORA', prob: pForaBase },
       ].sort((a, b) => b.prob - a.prob)
-      const melhor = opcoes[0]
-      mercadoNome = melhor.nome
-      probFinal = Math.round(melhor.prob)
+
+      mercadoNome = opcoes[0].nome
+      probFinal = Math.round(opcoes[0].prob)
       confiancaFinal = Math.abs(boost) > 15 ? 88 : Math.abs(boost) > 8 ? 78 : Math.abs(probFinal - 50) > 20 ? 70 : 55
     }
+
+    const motivo = `Jan:${janela}L | Seq:${seq}${dir === false ? 'R' : 'G'} | Var:${varOver > 0 ? '+' : ''}${varOver}% | ${mediaGJan}g`
 
     resultado.push({
       minuto: min, mercado: mercadoNome,
       probabilidade: Math.round(probFinal), confianca: confiancaFinal,
-      motivo: `Seq:${seq} | Ciclo≈${cicloMedio} | Rec:${pO25Rec}% | ${mediaG}g`,
+      motivo,
     })
   })
 
