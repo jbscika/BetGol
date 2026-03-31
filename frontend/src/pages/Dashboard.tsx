@@ -121,38 +121,6 @@ function Dashboard() {
         </div>
       </header>
 
-      {/* LIGA TABS */}
-      <div style={{
-        display: 'flex',
-        background: '#f5f5f5',
-        borderBottom: '1px solid #d0d0d0',
-        overflowX: 'auto',
-        padding: '0 24px',
-      }}>
-        {Object.keys(LIGAS).map(liga => (
-          <button
-            key={liga}
-            onClick={() => setLigaSelecionada(liga)}
-            style={{
-              padding: '12px 20px',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: ligaSelecionada === liga ? '3px solid #1a7a3a' : '3px solid transparent',
-              color: ligaSelecionada === liga ? '#1a7a3a' : '#444444',
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontWeight: 600,
-              fontSize: '13px',
-              letterSpacing: '1.5px',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s',
-            }}
-          >
-            {liga.toUpperCase()}
-          </button>
-        ))}
-      </div>
-
       {/* CONTEÚDO */}
       <div style={{ padding: '16px 24px' }}>
         {carregando ? (
@@ -188,7 +156,14 @@ function Dashboard() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <IATendencia linhas={linhas} colunas={colunas} />
-            <GradeResultados linhas={linhas} colunas={colunas} horas={horas} liga={ligaSelecionada} />
+            <GradeResultados
+              linhas={linhas}
+              colunas={colunas}
+              horas={horas}
+              liga={ligaSelecionada}
+              ligas={Object.keys(LIGAS)}
+              onTrocarLiga={setLigaSelecionada}
+            />
           </div>
         )}
       </div>
