@@ -217,10 +217,10 @@ export default function GradeResultados({ linhas, colunas, horas, liga }: Props)
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
 
   const c = {
-    bg2: '#0d1214', bg3: '#131a1d', bg4: '#1a2328', borda: '#1e2d33',
-    verde: '#1a4a2e', vermelho: '#7a1010',
-    verdeClaro: '#00c853', vermelhoClaro: '#f44336',
-    texto: '#cfd8dc', texto2: '#607d8b', amarelo: '#ffd600', azul: '#2979ff',
+    bg2: '#ffffff', bg3: '#f5f5f5', bg4: '#e8e8e8', borda: '#d0d0d0',
+    verde: '#1a7a3a', vermelho: '#c0392b',
+    verdeClaro: '#1a7a3a', vermelhoClaro: '#c0392b',
+    texto: '#111111', texto2: '#444444', amarelo: '#b8600c', azul: '#1565c0',
   }
 
   const sel: any = { background: c.bg3, border: `1px solid ${c.borda}`, color: c.texto, padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none', cursor: 'pointer' }
