@@ -79,12 +79,12 @@ function Dashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080c0e', color: '#cfd8dc', fontFamily: "'Barlow', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#111111', fontFamily: "'Barlow', sans-serif" }}>
 
       {/* HEADER */}
       <header style={{
-        background: '#0d1214',
-        borderBottom: '1px solid #1e2d33',
+        background: '#ffffff',
+        borderBottom: '1px solid #d0d0d0',
         padding: '0 24px',
         height: '56px',
         display: 'flex',
@@ -95,27 +95,26 @@ function Dashboard() {
         zIndex: 100,
       }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: '32px', fontWeight: 800, letterSpacing: '3px', display: 'flex', alignItems: 'center', gap: '2px' }}>
-          <span style={{ color: '#00c853' }}>BET</span>
+          <span style={{ color: '#1a7a3a' }}>BET</span>
           <div style={{
-            width: '8px', height: '8px', background: '#00c853',
+            width: '8px', height: '8px', background: '#1a7a3a',
             borderRadius: '50%', margin: '0 4px',
-            animation: 'blink 2s infinite',
           }} />
-          <span style={{ color: '#fff' }}>GOL</span>
+          <span style={{ color: '#111111' }}>GOL</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{
-            background: '#8b1a1a', color: '#fff',
+            background: '#c0392b', color: '#fff',
             fontFamily: "'Barlow Condensed', sans-serif",
             fontSize: '11px', fontWeight: 700, letterSpacing: '2px',
             padding: '3px 8px', borderRadius: '2px',
           }}>
             AO VIVO
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#607d8b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#444444' }}>
             <div style={{
               width: '8px', height: '8px', borderRadius: '50%',
-              background: carregando ? '#b8960c' : '#00c853',
+              background: carregando ? '#b8600c' : '#1a7a3a',
             }} />
             {carregando ? 'Carregando...' : `${totalPartidas} partidas`}
           </div>
@@ -125,8 +124,8 @@ function Dashboard() {
       {/* LIGA TABS */}
       <div style={{
         display: 'flex',
-        background: '#0d1214',
-        borderBottom: '1px solid #1e2d33',
+        background: '#f5f5f5',
+        borderBottom: '1px solid #d0d0d0',
         overflowX: 'auto',
         padding: '0 24px',
       }}>
@@ -138,8 +137,8 @@ function Dashboard() {
               padding: '12px 20px',
               background: 'transparent',
               border: 'none',
-              borderBottom: ligaSelecionada === liga ? '3px solid #00e676' : '3px solid transparent',
-              color: ligaSelecionada === liga ? '#00c853' : '#607d8b',
+              borderBottom: ligaSelecionada === liga ? '3px solid #1a7a3a' : '3px solid transparent',
+              color: ligaSelecionada === liga ? '#1a7a3a' : '#444444',
               fontFamily: "'Barlow Condensed', sans-serif",
               fontWeight: 600,
               fontSize: '13px',
@@ -157,11 +156,11 @@ function Dashboard() {
       {/* CONTEÚDO */}
       <div style={{ padding: '16px 24px' }}>
         {carregando ? (
-          <div style={{ textAlign: 'center', padding: '80px', color: '#607d8b' }}>
+          <div style={{ textAlign: 'center', padding: '80px', color: '#444444' }}>
             <div style={{
               width: '40px', height: '40px',
-              border: '3px solid #1e2d33',
-              borderTopColor: '#00c853',
+              border: '3px solid #d0d0d0',
+              borderTopColor: '#1a7a3a',
               borderRadius: '50%',
               animation: 'spin 0.8s linear infinite',
               margin: '0 auto 16px',
