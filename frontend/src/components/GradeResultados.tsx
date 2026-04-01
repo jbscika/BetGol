@@ -209,8 +209,55 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
   }), [linhas, colunas, filtrosAtivos])
 
-  // IA Tendência
-  const tendencias = useMemo(() => {
+  // Melhores times para apostar (vitória casa, vitória fora, gols)
+  const melhoresParaApostar = useMemo(() => {
+    const times: Record<string, {
+      nome: string; jogos: number; vitoriasCasa: number; jogosCasa: number
+      vitoriasFor: number; jogosFora: number; gols: number
+    }> = {}
+
+    linhas20.forEach(linha => {
+      cols.forEach(col => {
+        const val = linha[col] as string
+        if (!val) return
+        const partes = val.split('</br>')[0].trim()
+        const m = partes.match(/^(.+?)\s+(\d+)\s*-\s*(\d+)\s+(.+)$/)
+        if (!m) return
+        const [, timeA, golsA, golsB, timeB] = m
+        const gA = parseInt(golsA), gB = parseInt(golsB)
+
+        if (!times[timeA]) times[timeA] = { nome: timeA, jogos: 0, vitoriasCasa: 0, jogosCasa: 0, vitoriasFor: 0, jogosFora: 0, gols: 0 }
+        if (!times[timeB]) times[timeB] = { nome: timeB, jogos: 0, vitoriasCasa: 0, jogosCasa: 0, vitoriasFor: 0, jogosFora: 0, gols: 0 }
+
+        // Time A joga em casa
+        times[timeA].jogosCasa++
+        times[timeA].gols += gA
+        if (gA > gB) times[timeA].vitoriasCasa++
+
+        // Time B joga fora
+        times[timeB].jogosFora++
+        times[timeB].gols += gB
+        if (gB > gA) times[timeB].vitoriasFor++
+
+        times[timeA].jogos++
+        times[timeB].jogos++
+      })
+    })
+
+    const arr = Object.values(times).filter(t => t.jogos >= 3)
+
+    return {
+      melhorCasa: arr.filter(t => t.jogosCasa >= 2)
+        .sort((a, b) => (b.vitoriasCasa / b.jogosCasa) - (a.vitoriasCasa / a.jogosCasa))
+        .slice(0, 5),
+      melhorFora: arr.filter(t => t.jogosFora >= 2)
+        .sort((a, b) => (b.vitoriasFor / b.jogosFora) - (a.vitoriasFor / a.jogosFora))
+        .slice(0, 5),
+      maisGols: arr
+        .sort((a, b) => (b.gols / b.jogos) - (a.gols / a.jogos))
+        .slice(0, 5),
+    }
+  }, [linhas, colunas])
     if (!mostrarIA || linhas.length < 5) return []
     return calcularIA(linhas, cols, tipoIA, filtrosAtivos)
   }, [linhas, colunas, tipoIA, mostrarIA, filtrosAtivos])
@@ -426,7 +473,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             })
             if (confrontos.length === 0) return null
             return (
-              <div style={{ flex: '1', minWidth: '280px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
+              <div style={{ flex: '1', minWidth: '220px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>CONFRONTOS FUTUROS</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {confrontos.map((cf, i) => (
@@ -440,6 +487,45 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
               </div>
             )
           })()}
+
+          {/* MELHOR VITÓRIA CASA */}
+          {melhoresParaApostar.melhorCasa.length > 0 && (
+            <div style={{ flex: '1', minWidth: '180px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1a7a3a', letterSpacing: '2px', marginBottom: '8px' }}>🏠 VITÓRIA CASA</div>
+              {melhoresParaApostar.melhorCasa.map((t, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
+                  <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
+                  <span style={{ color: '#1a7a3a', fontWeight: 700 }}>{Math.round(t.vitoriasCasa / t.jogosCasa * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* MELHOR VITÓRIA FORA */}
+          {melhoresParaApostar.melhorFora.length > 0 && (
+            <div style={{ flex: '1', minWidth: '180px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#c0392b', letterSpacing: '2px', marginBottom: '8px' }}>✈️ VITÓRIA FORA</div>
+              {melhoresParaApostar.melhorFora.map((t, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
+                  <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
+                  <span style={{ color: '#c0392b', fontWeight: 700 }}>{Math.round(t.vitoriasFor / t.jogosFora * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* MAIS GOLS */}
+          {melhoresParaApostar.maisGols.length > 0 && (
+            <div style={{ flex: '1', minWidth: '180px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>⚽ MAIS GOLS</div>
+              {melhoresParaApostar.maisGols.map((t, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
+                  <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
+                  <span style={{ color: '#1565c0', fontWeight: 700 }}>{(t.gols / t.jogos).toFixed(1)}g/j</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
