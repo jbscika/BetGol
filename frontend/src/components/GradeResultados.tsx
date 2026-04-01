@@ -342,43 +342,104 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </div>
       </div>
 
-      {/* FILTROS */}
-      <div style={{ background: c.bg2, border: `1px solid ${c.borda}`, borderRadius: '8px', padding: '12px 16px' }}>
-        <div style={{ fontSize: '10px', color: c.texto2, letterSpacing: '2px', marginBottom: '10px' }}>FILTROS</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+      {/* FILTROS + RANKING + CONFRONTOS */}
+      <div style={{ background: '#ffd600', border: `1px solid #e6c000`, borderRadius: '8px', padding: '12px 16px' }}>
+        <div style={{ fontSize: '10px', color: '#333', letterSpacing: '2px', marginBottom: '10px', fontWeight: 700 }}>FILTROS</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>OVER</span>
-            <select style={sel} value={filtros.over} onChange={e => setFiltros(p => ({ ...p, over: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>OVER</span>
+            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.over} onChange={e => setFiltros(p => ({ ...p, over: e.target.value }))}>
               <option value="">—</option>
               {['0.5','1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>UNDER</span>
-            <select style={sel} value={filtros.under} onChange={e => setFiltros(p => ({ ...p, under: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>UNDER</span>
+            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.under} onChange={e => setFiltros(p => ({ ...p, under: e.target.value }))}>
               <option value="">—</option>
               {['1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>AMBAS</span>
-            <select style={sel} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>AMBAS</span>
+            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
               <option value="">—</option>
               <option value="sim">Sim</option>
               <option value="nao">Não</option>
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: c.texto2, fontWeight: 700 }}>RESULTADO</span>
-            <select style={sel} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>RESULTADO</span>
+            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
               <option value="">—</option>
               <option value="casa">Casa</option>
               <option value="empate">Empate</option>
               <option value="fora">Fora</option>
             </select>
           </div>
-          <button onClick={aplicar} style={{ background: c.verdeClaro, color: '#000', border: 'none', padding: '7px 18px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
-          <button onClick={limpar} style={{ background: 'transparent', color: c.texto2, border: `1px solid ${c.borda}`, padding: '7px 14px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+          <button onClick={aplicar} style={{ background: '#1a7a3a', color: '#fff', border: 'none', padding: '7px 18px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
+          <button onClick={limpar} style={{ background: '#fff', color: '#333', border: `1px solid #ccc`, padding: '7px 14px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+        </div>
+
+        {/* RANKING + CONFRONTOS lado a lado */}
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+
+          {/* RANKING */}
+          {rankingTimes.length > 0 && (
+            <div style={{ flex: '1', minWidth: '280px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>RANKING — ÚLTIMAS 20H</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <thead>
+                  <tr style={{ background: '#1565c0', color: '#fff' }}>
+                    {['#','TIME','J','V','GM','GS','%V'].map(h => (
+                      <th key={h} style={{ padding: '3px 6px', textAlign: h === 'TIME' ? 'left' : 'center', fontWeight: 600 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankingTimes.map((t, i) => (
+                    <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '3px 6px', fontWeight: 700, color: i < 3 ? '#1565c0' : '#333', textAlign: 'center' }}>{i + 1}</td>
+                      <td style={{ padding: '3px 6px', fontWeight: 600, color: '#111' }}>{t.nome}</td>
+                      <td style={{ padding: '3px 6px', textAlign: 'center', color: '#333' }}>{t.jogos}</td>
+                      <td style={{ padding: '3px 6px', textAlign: 'center', fontWeight: 700, color: '#1a7a3a' }}>{t.vitorias}</td>
+                      <td style={{ padding: '3px 6px', textAlign: 'center', color: '#1a7a3a', fontWeight: 700 }}>{t.gols}</td>
+                      <td style={{ padding: '3px 6px', textAlign: 'center', color: '#c0392b' }}>{t.golsSofridos}</td>
+                      <td style={{ padding: '3px 6px', textAlign: 'center', fontWeight: 700, color: '#1565c0' }}>{Math.round(t.vitorias / t.jogos * 100)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* CONFRONTOS FUTUROS */}
+          {linhas.length > 0 && (() => {
+            const proxima = linhas[0]
+            const confrontos: { minuto: string; times: string }[] = []
+            cols.forEach(col => {
+              const val = proxima[col] as string
+              if (!val) return
+              const linha = val.split('</br>')[0].trim()
+              const m = linha.match(/^(.+?)\s+\d+\s*-\s*\d+\s+(.+)$/)
+              if (m) confrontos.push({ minuto: col.replace('tempo', ''), times: `${m[1]} vs ${m[2]}` })
+            })
+            if (confrontos.length === 0) return null
+            return (
+              <div style={{ flex: '1', minWidth: '280px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>CONFRONTOS FUTUROS</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {confrontos.map((cf, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0', borderBottom: '1px solid #eee' }}>
+                      <span style={{ color: '#1565c0', fontWeight: 700, fontSize: '11px', minWidth: '30px' }}>{cf.minuto}</span>
+                      <span style={{ color: '#111', fontSize: '11px' }}>{cf.times}</span>
+                      <span style={{ color: '#1a7a3a', fontSize: '10px', marginLeft: 'auto', fontWeight: 700 }}>→ {proximaHora(cf.minuto)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -504,67 +565,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           {!temFiltro && <span style={{ marginLeft: '12px', color: '#b8600c' }}>← Selecione um filtro para ver probabilidade por minuto</span>}
         </div>
       )}
-
-      {/* RANKING DOS MELHORES TIMES */}
-      {rankingTimes.length > 0 && (
-        <div style={{ background: '#ffffff', border: `1px solid #cccccc`, borderRadius: '8px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '10px' }}>
-            RANKING DOS MELHORES TIMES — ÚLTIMAS 20H
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-            <thead>
-              <tr style={{ background: '#1565c0', color: '#fff' }}>
-                {['#','TIME','J','V','GOLS','GM','GS','%V'].map(h => (
-                  <th key={h} style={{ padding: '5px 8px', textAlign: h === 'TIME' ? 'left' : 'center', fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rankingTimes.map((t, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#ffffff', borderBottom: '1px solid #eeeeee' }}>
-                  <td style={{ padding: '4px 8px', fontWeight: 700, color: i < 3 ? '#1565c0' : '#333', textAlign: 'center' }}>{i + 1}</td>
-                  <td style={{ padding: '4px 8px', fontWeight: 600, color: '#111' }}>{t.nome}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#333' }}>{t.jogos}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 700, color: '#1a7a3a' }}>{t.vitorias}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#333' }}>{t.gols + t.golsSofridos}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#1a7a3a', fontWeight: 700 }}>{t.gols}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', color: '#c0392b' }}>{t.golsSofridos}</td>
-                  <td style={{ padding: '4px 8px', textAlign: 'center', fontWeight: 700, color: '#1565c0' }}>{Math.round(t.vitorias / t.jogos * 100)}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* CONFRONTOS FUTUROS */}
-      {linhas.length > 0 && (() => {
-        const proxima = linhas[0]
-        const confrontos: { minuto: string; times: string }[] = []
-        cols.forEach(col => {
-          const val = proxima[col] as string
-          if (!val) return
-          const linha = val.split('</br>')[0].trim()
-          const m = linha.match(/^(.+?)\s+\d+\s*-\s*\d+\s+(.+)$/)
-          if (m) confrontos.push({ minuto: col.replace('tempo', ''), times: `${m[1]} vs ${m[2]}` })
-        })
-        if (confrontos.length === 0) return null
-        return (
-          <div style={{ background: '#ffffff', border: `1px solid #cccccc`, borderRadius: '8px', padding: '12px 14px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '10px' }}>
-              CONFRONTOS FUTUROS — PRÓXIMA HORA
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {confrontos.map((cf, i) => (
-                <div key={i} style={{ background: '#f0f0f0', border: '1px solid #cccccc', borderRadius: '4px', padding: '4px 10px', fontSize: '11px' }}>
-                  <span style={{ color: '#1565c0', fontWeight: 700 }}>MIN {cf.minuto}</span>
-                  <span style={{ color: '#333', marginLeft: '6px' }}>{cf.times}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }
