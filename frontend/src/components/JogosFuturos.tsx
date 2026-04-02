@@ -12,12 +12,12 @@ export default function JogosFuturos({ linhas, colunas, horas }: Props) {
     if (!linhas || linhas.length === 0) return []
 
     const proximaLinha = linhas[0] 
-    const historico = linhas.slice(0, 20) 
+    const historico = linhas.slice(0, 25) 
     const confrontosFuturos: any[] = []
 
     const statsTimes: Record<string, { jogos: number; golsFeitos: number; golsSofridos: number; over25: number; ambas: number }> = {}
 
-    // Processa histórico para gerar as probabilidades
+    // Processa histórico para gerar estatísticas
     historico.forEach(linha => {
       colunas.forEach(col => {
         const val = linha[col] as string
@@ -41,13 +41,14 @@ export default function JogosFuturos({ linhas, colunas, horas }: Props) {
       })
     })
 
-    // Gera as projeções para a linha atual
+    // Gera as projeções para a linha atual (Jogos sem placar)
     colunas.forEach(col => {
       const val = proximaLinha[col] as string
-      if (!val || val.includes('-')) return // Pula se já tiver placar
+      if (!val || val.includes('-')) return 
       
-      const times = val.split('</br>')[0].trim()
-      const m = times.match(/^(.+?)\s+[vx]\s+(.+)$/i) || times.match(/^(.+?)\s{2,}(.+)$/)
+      const timesStr = val.split('</br>')[0].trim()
+      // Regex para capturar times em formatos como "Brasil v Itália" ou "Brasil   Itália"
+      const m = timesStr.match(/^(.+?)\s+[vx]\s+(.+)$/i) || timesStr.match(/^(.+?)\s{2,}(.+)$/)
       
       if (m && statsTimes[m[1].trim()] && statsTimes[m[2].trim()]) {
         const tC = m[1].trim(), tF = m[2].trim()
@@ -61,8 +62,7 @@ export default function JogosFuturos({ linhas, colunas, horas }: Props) {
           timeCasa: tC,
           timeFora: tF,
           probOver: pOver,
-          probAmbas: pAmbas,
-          cor: pOver > 70 ? '#1a7a3a' : '#444'
+          probAmbas: pAmbas
         })
       }
     })
@@ -70,13 +70,22 @@ export default function JogosFuturos({ linhas, colunas, horas }: Props) {
     return confrontosFuturos.slice(0, 4) 
   }, [linhas, colunas])
 
-  if (jogosProjetados.length === 0) return null
+  // Se não houver jogos futuros, mostra um aviso de espera em vez de sumir
+  if (jogosProjetados.length === 0) {
+    return (
+      <div style={{ background: '#f8f9fa', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '15px', marginBottom: '10px', textAlign: 'center' }}>
+        <p style={{ margin: 0, fontSize: '13px', color: '#666', fontWeight: 600 }}>
+          ⏳ AGUARDANDO PRÓXIMOS JOGOS PARA PROJEÇÃO...
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ background: '#f8f9fa', border: '1px solid #e0e0e0', borderRadius: '12px', padding: '20px', marginBottom: '10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-        <div style={{ width: '12px', height: '12px', background: '#1a7a3a', borderRadius: '50%' }} />
-        <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#111', letterSpacing: '1px' }}>
+        <div style={{ width: '10px', height: '10px', background: '#1a7a3a', borderRadius: '50%' }} />
+        <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#111' }}>
           PROJEÇÕES DE INTELIGÊNCIA (PRÓXIMOS JOGOS)
         </h3>
       </div>
@@ -88,11 +97,9 @@ export default function JogosFuturos({ linhas, colunas, horas }: Props) {
               <span>MINUTO {j.minuto}</span>
               <span style={{ color: '#1a7a3a' }}>LIVE</span>
             </div>
-            
             <div style={{ fontSize: '13px', fontWeight: 600, color: '#333', marginBottom: '12px', textAlign: 'center' }}>
-              {j.timeCasa} <span style={{ color: '#999', margin: '0 4px' }}>vs</span> {j.timeFora}
+              {j.timeCasa} <span style={{ color: '#999' }}>vs</span> {j.timeFora}
             </div>
-
             <div style={{ display: 'flex', gap: '10px' }}>
               <div style={{ flex: 1, textAlign: 'center', padding: '6px', background: '#f0fdf4', borderRadius: '6px' }}>
                 <div style={{ fontSize: '9px', color: '#166534', fontWeight: 700 }}>OVER 2.5</div>
