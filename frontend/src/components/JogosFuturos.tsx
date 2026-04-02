@@ -10,100 +10,85 @@ export default function JogosFuturos({ linhas, colunas }: Props) {
   const jogosProjetados = useMemo(() => {
     if (!linhas || linhas.length === 0) return []
 
-    const statsTimes: Record<string, { j: number; o25: number; amb: number }> = {}
-    const confrontosFuturos: any[] = []
+    const stats: Record<string, { j: number; o25: number; amb: number }> = {}
+    const futuros: any[] = []
 
-    // 1. MAPEIA TUDO QUE JÁ TEM PLACAR (HISTÓRICO)
+    // Função para limpar o nome do time (remove HTML, espaços e deixa minúsculo)
+    const limpar = (t: string) => t.replace(/<[^>]*>/g, '').split(/\d/)[0].trim().toLowerCase()
+
+    // 1. MAPEIA HISTÓRICO
     linhas.forEach(linha => {
       colunas.forEach(col => {
         const val = linha[col] as string
         if (!val || !val.includes('-')) return 
         
-        const partes = val.split('</br>')[0].trim()
-        const m = partes.match(/^(.+?)\s+(\d+)\s*-\s*(\d+)\s+(.+)$/)
+        const texto = val.replace(/<[^>]*>/g, ' ').trim()
+        const m = texto.match(/^(.+?)\s+(\d+)\s*-\s*(\d+)\s+(.+)$/)
         if (!m) return
 
-        const tA = m[1].trim().toLowerCase()
-        const tB = m[4].trim().toLowerCase()
+        const tA = limpar(m[1]), tB = limpar(m[4])
         const gA = parseInt(m[2]), gB = parseInt(m[3])
         
         const reg = (t: string, f: number, s: number) => {
-          if (!statsTimes[t]) statsTimes[t] = { j: 0, o25: 0, amb: 0 }
-          statsTimes[t].j++
-          if (f + s > 2.5) statsTimes[t].o25++
-          if (f > 0 && s > 0) statsTimes[t].amb++
+          if (!t) return
+          if (!stats[t]) stats[t] = { j: 0, o25: 0, amb: 0 }
+          stats[t].j++
+          if (f + s > 2.5) stats[t].o25++
+          if (f > 0 && s > 0) stats[t].amb++
         }
         reg(tA, gA, gB); reg(tB, gB, gA)
       })
     })
 
-    // 2. BUSCA JOGOS FUTUROS EM QUALQUER LUGAR DA GRADE
-    // Vamos olhar as primeiras 3 linhas para garantir
-    linhas.slice(0, 3).forEach(linha => {
+    // 2. BUSCA JOGOS FUTUROS (Qualquer um sem o traço de placar)
+    // Varre as primeiras 2 linhas da grade
+    linhas.slice(0, 2).forEach(linha => {
       colunas.forEach(col => {
-        const val = linha[col] as string
-        if (!val) return
+        const val = (linha[col] as string) || ''
+        if (!val || val.includes('-') || val.length < 5) return 
         
-        // Se NÃO tem o padrão "número - número", é um jogo futuro
-        const temPlacar = /\d\s*-\s*\d/.test(val)
+        const textoLimpo = val.replace(/<[^>]*>/g, ' ').trim()
+        // Tenta separar por qualquer coisa que pareça um separador (v, x, vs)
+        const partes = textoLimpo.split(/\s+(?:v|x|vs)\s+/i)
         
-        if (!temPlacar) {
-          const limpo = val.split('</br>')[0].trim()
-          const partes = limpo.split(/\s+(?:v|x|vs)\s+/i)
-          
-          if (partes.length === 2) {
-            const tC = partes[0].trim().toLowerCase()
-            const tF = partes[1].trim().toLowerCase()
+        if (partes.length >= 2) {
+          const nomeA = partes[0].trim()
+          const nomeB = partes[1].trim()
+          const tA = limpar(nomeA), tB = limpar(nomeB)
 
-            if (statsTimes[tC] && statsTimes[tF]) {
-              const pOver = Math.round(((statsTimes[tC].o25 / statsTimes[tC].j) + (statsTimes[tF].o25 / statsTimes[tF].j)) / 2 * 100)
-              const pAmbas = Math.round(((statsTimes[tC].amb / statsTimes[tC].j) + (statsTimes[tF].amb / statsTimes[tF].j)) / 2 * 100)
-              
-              confrontosFuturos.push({
-                min: col.replace('tempo', ''),
-                tCasa: partes[0].trim(),
-                tFora: partes[1].trim(),
-                pOver,
-                pAmbas
-              })
-            }
+          if (stats[tA] && stats[tB]) {
+            const pOver = Math.round(((stats[tA].o25 / stats[tA].j) + (stats[tB].o25 / stats[tB].j)) / 2 * 100)
+            const pAmbas = Math.round(((stats[tA].amb / stats[tA].j) + (stats[tB].amb / stats[tB].j)) / 2 * 100)
+            futuros.push({ min: col.replace('tempo', ''), tA: nomeA, tB: nomeB, pOver, pAmbas })
           }
         }
       })
     })
 
-    // Remove duplicados e pega os 4 primeiros
-    return confrontosFuturos.filter((v, i, a) => a.findIndex(t => (t.tCasa === v.tCasa)) === i).slice(0, 4)
+    return futuros.filter((v, i, a) => a.findIndex(t => t.tA === v.tA) === i).slice(0, 4)
   }, [linhas, colunas])
 
-  if (jogosProjetados.length === 0) {
-    return (
-      <div style={{ background: '#fff9e6', border: '1px solid #ffe58f', borderRadius: '8px', padding: '15px', marginBottom: '10px', textAlign: 'center' }}>
-        <div style={{ fontSize: '14px', color: '#856404', fontWeight: 700 }}>⚠️ NENHUM JOGO FUTURO IDENTIFICADO</div>
-        <p style={{ fontSize: '11px', color: '#856404', margin: '5px 0 0' }}>Certifique-se de que a extensão está enviando os jogos que ainda vão começar.</p>
-      </div>
-    )
-  }
+  if (jogosProjetados.length === 0) return null // Se não achar nada, ele se esconde
 
   return (
-    <div style={{ background: '#fff', border: '2px solid #1a7a3a', borderRadius: '12px', padding: '15px', marginBottom: '15px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px' }}>
+    <div style={{ background: '#fff', border: '2px solid #1a7a3a', borderRadius: '12px', padding: '15px', marginBottom: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <div style={{ width: '10px', height: '10px', background: '#1a7a3a', borderRadius: '50%' }} />
-        <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#1a7a3a' }}>PRÓXIMOS JOGOS (TENDÊNCIA IA)</h3>
+        <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: '#1a7a3a' }}>PROXIMOS JOGOS COM TENDÊNCIA</h3>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
         {jogosProjetados.map((j, i) => (
-          <div key={i} style={{ background: '#fcfcfc', border: '1px solid #eee', borderRadius: '10px', padding: '12px' }}>
-            <div style={{ fontSize: '10px', fontWeight: 700, color: '#666', marginBottom: '5px' }}>MINUTO {j.min}</div>
-            <div style={{ fontSize: '13px', fontWeight: 800, marginBottom: '10px' }}>{j.tCasa} x {j.tFora}</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <div style={{ flex: 1, background: '#1a7a3a', padding: '8px', borderRadius: '6px', textAlign: 'center', color: '#fff' }}>
-                <div style={{ fontSize: '9px', fontWeight: 700 }}>OVER 2.5</div>
-                <div style={{ fontSize: '16px', fontWeight: 900 }}>{j.pOver}%</div>
+          <div key={i} style={{ border: '1px solid #f0f0f0', borderRadius: '10px', padding: '10px', background: '#fafafa' }}>
+            <div style={{ fontSize: '10px', fontWeight: 800, color: '#666' }}>MINUTO {j.min}</div>
+            <div style={{ fontSize: '12px', fontWeight: 700, margin: '8px 0' }}>{j.tA} x {j.tB}</div>
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <div style={{ flex: 1, background: '#1a7a3a', padding: '5px', borderRadius: '6px', textAlign: 'center', color: '#fff' }}>
+                <div style={{ fontSize: '8px' }}>OVER 2.5</div>
+                <div style={{ fontSize: '14px', fontWeight: 900 }}>{j.pOver}%</div>
               </div>
-              <div style={{ flex: 1, background: '#1d4ed8', padding: '8px', borderRadius: '6px', textAlign: 'center', color: '#fff' }}>
-                <div style={{ fontSize: '9px', fontWeight: 700 }}>AMBAS</div>
-                <div style={{ fontSize: '16px', fontWeight: 900 }}>{j.pAmbas}%</div>
+              <div style={{ flex: 1, background: '#1d4ed8', padding: '5px', borderRadius: '6px', textAlign: 'center', color: '#fff' }}>
+                <div style={{ fontSize: '8px' }}>AMBAS</div>
+                <div style={{ fontSize: '14px', fontWeight: 900 }}>{j.pAmbas}%</div>
               </div>
             </div>
           </div>
