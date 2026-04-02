@@ -341,51 +341,44 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
     .slice(0, 5)
 
+  const [painelAtivo, setPainelAtivo] = useState<'casa' | 'fora' | 'gols'>('casa')
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-      {/* STATS */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          {[
-            { lbl: 'MEDIA GREENS', val: `${stats20.pct}%`, cor: '#1a7a3a' },
-            { lbl: 'MÉDIA GOLS', val: String(stats20.mediaGols), cor: '#b8600c' },
-            { lbl: 'PARTIDAS', val: String(stats20.total), cor: '#111111' },
-          ].map(s => (
-            <div key={s.lbl} style={{ background: '#1565c0', border: `1px solid #1040a0`, borderRadius: '6px', padding: '8px 14px' }}>
-              <div style={{ fontSize: '10px', color: '#aaccff', letterSpacing: '2px' }}>{s.lbl}</div>
-              <div style={{ fontSize: '22px', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>{s.val}</div>
-            </div>
-          ))}
+      {/* STATS + LIGAS */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+        {/* Cards pequenos */}
+        {[
+          { lbl: 'GREENS', val: `${stats20.pct}%` },
+          { lbl: 'GOLS', val: String(stats20.mediaGols) },
+          { lbl: 'PARTIDAS', val: String(stats20.total) },
+        ].map(s => (
+          <div key={s.lbl} style={{ background: '#1565c0', border: `1px solid #1040a0`, borderRadius: '6px', padding: '5px 10px' }}>
+            <div style={{ fontSize: '9px', color: '#aaccff', letterSpacing: '1px' }}>{s.lbl}</div>
+            <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', fontFamily: 'monospace' }}>{s.val}</div>
+          </div>
+        ))}
 
-          {/* LIGAS */}
-          {ligas && ligas.map(l => (
-            <button
-              key={l}
-              onClick={() => onTrocarLiga && onTrocarLiga(l)}
-              style={{
-                padding: '8px 16px',
-                background: liga === l ? '#1a7a3a' : '#f0f0f0',
-                border: `1px solid ${liga === l ? '#1a7a3a' : '#cccccc'}`,
-                borderRadius: '6px',
-                color: liga === l ? '#fff' : '#444',
-                fontWeight: 700,
-                fontSize: '12px',
-                letterSpacing: '1px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-            >
-              {l.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: mostrarIA ? '#1a7a3a' : '#e0e0e0', color: mostrarIA ? '#fff' : '#333' }}>
+        {/* LIGAS */}
+        {ligas && ligas.map(l => (
+          <button key={l} onClick={() => onTrocarLiga && onTrocarLiga(l)} style={{
+            padding: '5px 12px', border: 'none', borderRadius: '6px',
+            background: liga === l ? '#1a7a3a' : '#1565c0',
+            color: '#fff', fontWeight: 700, fontSize: '11px',
+            letterSpacing: '1px', cursor: 'pointer', transition: 'all 0.2s',
+          }}>
+            {l.toUpperCase()}
+          </button>
+        ))}
+
+        {/* IA BOTÕES */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '5px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '11px', background: mostrarIA ? '#1a7a3a' : '#1565c0', color: '#fff' }}>
             IA {mostrarIA ? 'ON' : 'OFF'}
           </button>
           {mostrarIA && ([1,2,3] as const).map(t => (
-            <button key={t} onClick={() => setTipoIA(t)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: tipoIA === t ? '#1565c0' : '#e0e0e0', color: tipoIA === t ? '#fff' : '#333' }}>
+            <button key={t} onClick={() => setTipoIA(t)} style={{ padding: '5px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '11px', background: tipoIA === t ? '#1a7a3a' : '#1565c0', color: '#fff' }}>
               TIPO {t}
             </button>
           ))}
@@ -393,48 +386,78 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       </div>
 
       {/* PAINÉIS AZUIS — MELHORES TIMES */}
-      <div style={{ background: '#1565c0', border: `1px solid #1040a0`, borderRadius: '8px', padding: '12px 16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-
-        {/* VITÓRIA CASA */}
-        <div style={{ flex: '1', minWidth: '160px', background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#1a7a3a', letterSpacing: '2px', marginBottom: '8px' }}>🏠 VITÓRIA CASA</div>
-          {melhoresParaApostar.melhorCasa.length === 0
-            ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados</div>
-            : melhoresParaApostar.melhorCasa.map((t, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
-                <span style={{ color: '#1a7a3a', fontWeight: 700 }}>{Math.round(t.vitoriasCasa / t.jogosCasa * 100)}%</span>
-              </div>
-            ))
-          }
+      <div style={{ background: '#1565c0', border: `1px solid #1040a0`, borderRadius: '8px', padding: '10px 14px' }}>
+        {/* Botões seletor */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+          {([
+            { key: 'casa', lbl: '🏠 VITÓRIA CASA' },
+            { key: 'fora', lbl: '✈️ VITÓRIA FORA' },
+            { key: 'gols', lbl: '⚽ MAIS GOLS' },
+          ] as const).map(b => (
+            <button key={b.key} onClick={() => setPainelAtivo(b.key)} style={{
+              padding: '5px 14px', border: 'none', borderRadius: '4px',
+              cursor: 'pointer', fontWeight: 700, fontSize: '11px',
+              background: painelAtivo === b.key ? '#1a7a3a' : '#2979ff',
+              color: '#fff', transition: 'all 0.2s',
+            }}>
+              {b.lbl}
+            </button>
+          ))}
         </div>
 
-        {/* VITÓRIA FORA */}
-        <div style={{ flex: '1', minWidth: '160px', background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#c0392b', letterSpacing: '2px', marginBottom: '8px' }}>✈️ VITÓRIA FORA</div>
-          {melhoresParaApostar.melhorFora.length === 0
-            ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados</div>
-            : melhoresParaApostar.melhorFora.map((t, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
-                <span style={{ color: '#c0392b', fontWeight: 700 }}>{Math.round(t.vitoriasFor / t.jogosFora * 100)}%</span>
-              </div>
-            ))
-          }
-        </div>
-
-        {/* MAIS GOLS */}
-        <div style={{ flex: '1', minWidth: '160px', background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>⚽ MAIS GOLS</div>
-          {melhoresParaApostar.maisGols.length === 0
-            ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados</div>
-            : melhoresParaApostar.maisGols.map((t, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
-                <span style={{ color: '#1565c0', fontWeight: 700 }}>{(t.gols / t.jogos).toFixed(1)}g/j</span>
-              </div>
-            ))
-          }
+        {/* Conteúdo do painel ativo */}
+        <div style={{ background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
+          {painelAtivo === 'casa' && (
+            <>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1a7a3a', letterSpacing: '2px', marginBottom: '8px' }}>MELHORES TIMES — VITÓRIA EM CASA</div>
+              {melhoresParaApostar.melhorCasa.length === 0
+                ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados suficientes</div>
+                : melhoresParaApostar.melhorCasa.map((t, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
+                    <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 400 }}>{i+1}. {t.nome}</span>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <span style={{ color: '#666', fontSize: '11px' }}>{t.jogosCasa}j</span>
+                      <span style={{ color: '#1a7a3a', fontWeight: 700 }}>{Math.round(t.vitoriasCasa / t.jogosCasa * 100)}% vitória</span>
+                    </div>
+                  </div>
+                ))
+              }
+            </>
+          )}
+          {painelAtivo === 'fora' && (
+            <>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#c0392b', letterSpacing: '2px', marginBottom: '8px' }}>MELHORES TIMES — VITÓRIA FORA DE CASA</div>
+              {melhoresParaApostar.melhorFora.length === 0
+                ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados suficientes</div>
+                : melhoresParaApostar.melhorFora.map((t, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
+                    <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 400 }}>{i+1}. {t.nome}</span>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <span style={{ color: '#666', fontSize: '11px' }}>{t.jogosFora}j</span>
+                      <span style={{ color: '#c0392b', fontWeight: 700 }}>{Math.round(t.vitoriasFor / t.jogosFora * 100)}% vitória</span>
+                    </div>
+                  </div>
+                ))
+              }
+            </>
+          )}
+          {painelAtivo === 'gols' && (
+            <>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>TIMES QUE MAIS MARCAM GOLS</div>
+              {melhoresParaApostar.maisGols.length === 0
+                ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados suficientes</div>
+                : melhoresParaApostar.maisGols.map((t, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
+                    <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 400 }}>{i+1}. {t.nome}</span>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <span style={{ color: '#666', fontSize: '11px' }}>{t.jogos}j</span>
+                      <span style={{ color: '#1565c0', fontWeight: 700 }}>{(t.gols / t.jogos).toFixed(1)} gols/jogo</span>
+                    </div>
+                  </div>
+                ))
+              }
+            </>
+          )}
         </div>
       </div>
 
