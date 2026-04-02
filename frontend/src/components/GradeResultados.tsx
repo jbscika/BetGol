@@ -378,14 +378,60 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: mostrarIA ? c.verdeClaro : c.bg4, color: mostrarIA ? '#000' : c.texto2 }}>
+          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: mostrarIA ? '#1a7a3a' : '#e0e0e0', color: mostrarIA ? '#fff' : '#333' }}>
             IA {mostrarIA ? 'ON' : 'OFF'}
           </button>
           {mostrarIA && ([1,2,3] as const).map(t => (
-            <button key={t} onClick={() => setTipoIA(t)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: tipoIA === t ? c.azul : c.bg4, color: tipoIA === t ? '#fff' : c.texto2 }}>
+            <button key={t} onClick={() => setTipoIA(t)} style={{ padding: '6px 14px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '12px', background: tipoIA === t ? '#1565c0' : '#e0e0e0', color: tipoIA === t ? '#fff' : '#333' }}>
               TIPO {t}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* PAINÉIS AZUIS — MELHORES TIMES */}
+      <div style={{ background: '#1565c0', border: `1px solid #1040a0`, borderRadius: '8px', padding: '12px 16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+
+        {/* VITÓRIA CASA */}
+        <div style={{ flex: '1', minWidth: '160px', background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: '#1a7a3a', letterSpacing: '2px', marginBottom: '8px' }}>🏠 VITÓRIA CASA</div>
+          {melhoresParaApostar.melhorCasa.length === 0
+            ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados</div>
+            : melhoresParaApostar.melhorCasa.map((t, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
+                <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
+                <span style={{ color: '#1a7a3a', fontWeight: 700 }}>{Math.round(t.vitoriasCasa / t.jogosCasa * 100)}%</span>
+              </div>
+            ))
+          }
+        </div>
+
+        {/* VITÓRIA FORA */}
+        <div style={{ flex: '1', minWidth: '160px', background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: '#c0392b', letterSpacing: '2px', marginBottom: '8px' }}>✈️ VITÓRIA FORA</div>
+          {melhoresParaApostar.melhorFora.length === 0
+            ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados</div>
+            : melhoresParaApostar.melhorFora.map((t, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
+                <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
+                <span style={{ color: '#c0392b', fontWeight: 700 }}>{Math.round(t.vitoriasFor / t.jogosFora * 100)}%</span>
+              </div>
+            ))
+          }
+        </div>
+
+        {/* MAIS GOLS */}
+        <div style={{ flex: '1', minWidth: '160px', background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>⚽ MAIS GOLS</div>
+          {melhoresParaApostar.maisGols.length === 0
+            ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados</div>
+            : melhoresParaApostar.maisGols.map((t, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
+                <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
+                <span style={{ color: '#1565c0', fontWeight: 700 }}>{(t.gols / t.jogos).toFixed(1)}g/j</span>
+              </div>
+            ))
+          }
         </div>
       </div>
 
