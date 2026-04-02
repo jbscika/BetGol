@@ -258,6 +258,9 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         .slice(0, 5),
     }
   }, [linhas, colunas])
+
+  // IA Tendência
+  const tendencias = useMemo(() => {
     if (!mostrarIA || linhas.length < 5) return []
     return calcularIA(linhas, cols, tipoIA, filtrosAtivos)
   }, [linhas, colunas, tipoIA, mostrarIA, filtrosAtivos])
