@@ -55,26 +55,24 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   const resultado: Tendencia[] = []
   const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
 
-  // Janela de linhas por tipo
-  const janela = tipoIA === 1 ? 3 : tipoIA === 2 ? 5 : 8
-  const linhasJanela = linhas.slice(0, janela)
-  const todasLinhas = linhas.slice(0, Math.min(linhas.length, 48))
+  // Linhas a comparar por tipo:
+  // Tipo 1: linha atual (0) vs anterior (1) — 2 linhas
+  // Tipo 2: atual (0) + última (1) + penúltima (2) — 3 linhas
+  // Tipo 3: atual (0) + última (1) + penúltima (2) + antepenúltima (3) — 4 linhas
+  const qtdLinhas = tipoIA === 1 ? 2 : tipoIA === 2 ? 3 : 4
+  const linhasComparacao = linhas.slice(0, qtdLinhas)
+  const linhasHistorico = linhas.slice(0, Math.min(linhas.length, 48))
 
-  colunas.forEach((col, colIdx) => {
-    // Histórico completo para calcular % base
-    const histCompleto: (PlacarInfo | null)[] = todasLinhas.map(l => extrairPlacar(l[col] as string))
+  colunas.forEach(col => {
+    // Histórico completo — base estatística
+    const histCompleto = linhasHistorico.map(l => extrairPlacar(l[col] as string))
     const validosCompleto = histCompleto.filter(Boolean) as PlacarInfo[]
     if (validosCompleto.length < 5) return
 
-    // Histórico da janela (linhas recentes)
-    const histJanela: (PlacarInfo | null)[] = linhasJanela.map(l => extrairPlacar(l[col] as string))
-    const validosJanela = histJanela.filter(Boolean) as PlacarInfo[]
-
     const min = col.replace('tempo', '')
     const n = validosCompleto.length
-    const nJ = validosJanela.length
 
-    // % base (histórico completo)
+    // % base histórica
     const pO25Base = Math.round(validosCompleto.filter(p => p.over25).length / n * 100)
     const pO15Base = Math.round(validosCompleto.filter(p => p.over15).length / n * 100)
     const pO35Base = Math.round(validosCompleto.filter(p => p.over35).length / n * 100)
@@ -84,47 +82,107 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const pForaBase = Math.round(validosCompleto.filter(p => p.foraVence).length / n * 100)
     const mediaGBase = Math.round(validosCompleto.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
 
-    // % da janela recente
-    const pO25Jan = nJ > 0 ? Math.round(validosJanela.filter(p => p.over25).length / nJ * 100) : pO25Base
-    const pAmbasJan = nJ > 0 ? Math.round(validosJanela.filter(p => p.ambasSim).length / nJ * 100) : pAmbasBase
-    const mediaGJan = nJ > 0 ? Math.round(validosJanela.reduce((s, p) => s + p.gols, 0) / nJ * 10) / 10 : mediaGBase
+    // Placares das linhas de comparação (0 = atual, 1 = anterior, etc.)
+    const placares = linhasComparacao.map(l => extrairPlacar(l[col] as string))
+    const atual = placares[0]
+    if (!atual) return
 
-    // Sequência atual na janela
-    let seq = 0; let dir: boolean | null = null
-    for (const p of histJanela) {
-      if (!p) continue
-      if (dir === null) { dir = p.over25; seq = 1 }
-      else if (p.over25 === dir) seq++
-      else break
+    // === NOVA LÓGICA: análise de padrão entre linhas ===
+
+    let boost = 0
+    let padraoDesc = ''
+
+    if (tipoIA === 1) {
+      // Tipo 1: atual vs anterior
+      const ant = placares[1]
+      if (ant) {
+        const seguindo = atual.over25 === ant.over25
+        const varGols = atual.gols - ant.gols
+
+        if (seguindo) {
+          // Mesma direção — possível reversão na próxima
+          boost = atual.over25 ? -12 : 12
+          padraoDesc = `2L iguais(${atual.over25 ? 'GG' : 'RR'})→reversão`
+        } else {
+          // Direções opostas — alternando, seguir o atual
+          boost = atual.over25 ? 8 : -8
+          padraoDesc = `Alternando→${atual.over25 ? 'G' : 'R'}`
+        }
+        if (varGols > 1) boost += 5
+        if (varGols < -1) boost -= 5
+      }
+
+    } else if (tipoIA === 2) {
+      // Tipo 2: atual + última + penúltima (3 linhas)
+      const ant1 = placares[1]
+      const ant2 = placares[2]
+      if (ant1 && ant2) {
+        const resultados = [ant2.over25, ant1.over25, atual.over25]
+        const todosIguais = resultados.every(r => r === resultados[0])
+        const ultimosDoisIguais = ant1.over25 === atual.over25
+        const tendenciaSubindo = !ant2.over25 && !ant1.over25 && !atual.over25 // 3 RED
+        const tendenciaOver = ant2.over25 && ant1.over25 && atual.over25 // 3 GREEN
+
+        if (tendenciaOver) {
+          boost = -18 // 3 greens seguidos → reversão esperada
+          padraoDesc = '3xGREEN→reversão'
+        } else if (tendenciaSubindo) {
+          boost = 20 // 3 reds seguidos → correção forte
+          padraoDesc = '3xRED→correção forte'
+        } else if (todosIguais) {
+          boost = atual.over25 ? -12 : 14
+          padraoDesc = `Padrão uniforme→reversão`
+        } else if (ultimosDoisIguais) {
+          boost = atual.over25 ? -8 : 10
+          padraoDesc = `2 iguais recentes→reversão`
+        } else {
+          // Alternando — sem padrão claro
+          boost = 0
+          padraoDesc = 'Sem padrão claro'
+        }
+      }
+
+    } else {
+      // Tipo 3: atual + 3 anteriores (4 linhas)
+      const ant1 = placares[1]
+      const ant2 = placares[2]
+      const ant3 = placares[3]
+      if (ant1 && ant2 && ant3) {
+        const resultados = [ant3.over25, ant2.over25, ant1.over25, atual.over25]
+        const redsConsec = resultados.filter(r => r === false).length
+        const greensConsec = resultados.filter(r => r === true).length
+        const mediaGolsRecente = [ant3, ant2, ant1, atual].reduce((s, p) => s + p.gols, 0) / 4
+
+        // Contar sequência atual
+        let seqAtual = 1
+        for (let i = 1; i < resultados.length; i++) {
+          if (resultados[resultados.length - 1 - i] === atual.over25) seqAtual++
+          else break
+        }
+
+        if (redsConsec === 4) {
+          boost = 25 // 4 reds = correção muito provável
+          padraoDesc = '4xRED→correção muito provável'
+        } else if (greensConsec === 4) {
+          boost = -20
+          padraoDesc = '4xGREEN→reversão muito provável'
+        } else if (redsConsec === 3) {
+          boost = 18
+          padraoDesc = '3/4 RED→correção provável'
+        } else if (greensConsec === 3) {
+          boost = -15
+          padraoDesc = '3/4 GREEN→reversão provável'
+        } else {
+          boost = atual.over25 ? -5 : 5
+          padraoDesc = `Misto(${redsConsec}R/${greensConsec}G)`
+        }
+
+        // Ajuste por média de gols recente
+        if (mediaGolsRecente > mediaGBase + 0.5) boost -= 5
+        if (mediaGolsRecente < mediaGBase - 0.5) boost += 5
+      }
     }
 
-    // Variação: janela vs histórico (indica tendência)
-    const varOver = pO25Jan - pO25Base // positivo = janela mais over que histórico
-    const varAmbas = pAmbasJan - pAmbasBase
-    const varGols = mediaGJan - mediaGBase
-
-    // Ajuste baseado na variação e sequência
-    let boost = 0
-
-    // Se janela tem menos over que histórico → over está "devendo" → boost positivo
-    if (varOver < -15) boost += 20
-    else if (varOver < -8) boost += 12
-    else if (varOver > 15) boost -= 15
-    else if (varOver > 8) boost -= 8
-
-    // Sequência de RED na janela → correção esperada
-    if (seq >= janela && dir === false) boost += 15
-    else if (seq >= Math.floor(janela * 0.7) && dir === false) boost += 10
-
-    // Sequência de GREEN na janela → possível reversão
-    if (seq >= janela && dir === true) boost -= 15
-    else if (seq >= Math.floor(janela * 0.7) && dir === true) boost -= 10
-
-    // Média de gols da janela
-    if (varGols > 0.5) boost += 5
-    if (varGols < -0.5) boost -= 5
-
-    // Calcular probabilidade final
     const baseOver25 = Math.min(Math.max(pO25Base + boost, 10), 93)
 
     let mercadoNome = ''
@@ -133,11 +191,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
 
     if (temFiltro) {
       const greensBase = validosCompleto.filter(p => passaFiltro(p, filtroAtivo)).length
-      const greensJan = validosJanela.filter(p => passaFiltro(p, filtroAtivo)).length
       const pctBase = Math.round(greensBase / n * 100)
-      const pctJan = nJ > 0 ? Math.round(greensJan / nJ * 100) : pctBase
-      const varFiltro = pctJan - pctBase
-
       const partes = []
       if (filtroAtivo.over) partes.push(`OVER ${filtroAtivo.over}`)
       if (filtroAtivo.under) partes.push(`UNDER ${filtroAtivo.under}`)
@@ -145,33 +199,28 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       if (filtroAtivo.ambas === 'nao') partes.push('AMBAS NÃO')
       if (filtroAtivo.resultado) partes.push(filtroAtivo.resultado.toUpperCase())
       mercadoNome = partes.join(' + ')
-
-      // Se janela tem menos green que histórico → mercado está "devendo"
-      probFinal = Math.min(Math.max(pctBase + (varFiltro < -10 ? 20 : varFiltro < 0 ? 10 : varFiltro > 10 ? -10 : 0), 10), 93)
-      confiancaFinal = Math.abs(varFiltro) > 15 ? 88 : Math.abs(varFiltro) > 8 ? 78 : Math.abs(probFinal - 50) > 20 ? 70 : 55
+      probFinal = Math.min(Math.max(pctBase + boost, 10), 93)
+      confiancaFinal = Math.abs(boost) > 18 ? 90 : Math.abs(boost) > 10 ? 80 : Math.abs(probFinal - 50) > 20 ? 70 : 55
     } else {
       const opcoes = [
         { nome: 'OVER 1.5', prob: Math.min(pO15Base, 95) },
         { nome: 'OVER 2.5', prob: baseOver25 },
         { nome: 'UNDER 2.5', prob: Math.min(100 - baseOver25, 93) },
-        { nome: 'OVER 3.5', prob: Math.min(pO35Base + (mediaGJan > 3 ? 8 : 0), 88) },
-        { nome: 'AMBAS SIM', prob: Math.min(pAmbasBase + (varAmbas < -10 ? 15 : 0), 92) },
+        { nome: 'OVER 3.5', prob: Math.min(pO35Base + (atual.gols > 3 ? 8 : 0), 88) },
+        { nome: 'AMBAS SIM', prob: Math.min(pAmbasBase + (boost > 10 ? 10 : 0), 92) },
         { nome: 'CASA', prob: pCasaBase },
         { nome: 'EMPATE', prob: pEmpBase },
         { nome: 'FORA', prob: pForaBase },
       ].sort((a, b) => b.prob - a.prob)
-
       mercadoNome = opcoes[0].nome
       probFinal = Math.round(opcoes[0].prob)
-      confiancaFinal = Math.abs(boost) > 15 ? 88 : Math.abs(boost) > 8 ? 78 : Math.abs(probFinal - 50) > 20 ? 70 : 55
+      confiancaFinal = Math.abs(boost) > 18 ? 90 : Math.abs(boost) > 10 ? 80 : Math.abs(probFinal - 50) > 20 ? 70 : 55
     }
-
-    const motivo = `Jan:${janela}L | Seq:${seq}${dir === false ? 'R' : 'G'} | Var:${varOver > 0 ? '+' : ''}${varOver}% | ${mediaGJan}g`
 
     resultado.push({
       minuto: min, mercado: mercadoNome,
       probabilidade: Math.round(probFinal), confianca: confiancaFinal,
-      motivo,
+      motivo: padraoDesc,
     })
   })
 
@@ -209,53 +258,33 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
   }), [linhas, colunas, filtrosAtivos])
 
-  // Melhores times para apostar (vitória casa, vitória fora, gols)
+  // Melhores minutos para apostar — baseado em % histórica por coluna (últimas 20 linhas)
   const melhoresParaApostar = useMemo(() => {
-    const times: Record<string, {
-      nome: string; jogos: number; vitoriasCasa: number; jogosCasa: number
-      vitoriasFor: number; jogosFora: number; gols: number
-    }> = {}
-
-    linhas20.forEach(linha => {
-      cols.forEach(col => {
-        const val = linha[col] as string
-        if (!val) return
-        const partes = val.split('</br>')[0].trim()
-        const m = partes.match(/^(.+?)\s+(\d+)\s*-\s*(\d+)\s+(.+)$/)
-        if (!m) return
-        const [, timeA, golsA, golsB, timeB] = m
-        const gA = parseInt(golsA), gB = parseInt(golsB)
-
-        if (!times[timeA]) times[timeA] = { nome: timeA, jogos: 0, vitoriasCasa: 0, jogosCasa: 0, vitoriasFor: 0, jogosFora: 0, gols: 0 }
-        if (!times[timeB]) times[timeB] = { nome: timeB, jogos: 0, vitoriasCasa: 0, jogosCasa: 0, vitoriasFor: 0, jogosFora: 0, gols: 0 }
-
-        // Time A joga em casa
-        times[timeA].jogosCasa++
-        times[timeA].gols += gA
-        if (gA > gB) times[timeA].vitoriasCasa++
-
-        // Time B joga fora
-        times[timeB].jogosFora++
-        times[timeB].gols += gB
-        if (gB > gA) times[timeB].vitoriasFor++
-
-        times[timeA].jogos++
-        times[timeB].jogos++
+    const porMinuto = cols.map(col => {
+      let total = 0, over25 = 0, casa = 0, fora = 0, gols = 0
+      linhas20.forEach(linha => {
+        const p = extrairPlacar(linha[col] as string)
+        if (!p) return
+        total++; gols += p.gols
+        if (p.over25) over25++
+        if (p.casaVence) casa++
+        if (p.foraVence) fora++
       })
-    })
-
-    const arr = Object.values(times).filter(t => t.jogos >= 3)
+      if (total === 0) return null
+      return {
+        min: col.replace('tempo', ''),
+        total,
+        pctOver: Math.round(over25 / total * 100),
+        pctCasa: Math.round(casa / total * 100),
+        pctFora: Math.round(fora / total * 100),
+        mediaGols: Math.round(gols / total * 10) / 10,
+      }
+    }).filter(Boolean) as { min: string; total: number; pctOver: number; pctCasa: number; pctFora: number; mediaGols: number }[]
 
     return {
-      melhorCasa: arr.filter(t => t.jogosCasa >= 2)
-        .sort((a, b) => (b.vitoriasCasa / b.jogosCasa) - (a.vitoriasCasa / a.jogosCasa))
-        .slice(0, 5),
-      melhorFora: arr.filter(t => t.jogosFora >= 2)
-        .sort((a, b) => (b.vitoriasFor / b.jogosFora) - (a.vitoriasFor / a.jogosFora))
-        .slice(0, 5),
-      maisGols: arr
-        .sort((a, b) => (b.gols / b.jogos) - (a.gols / a.jogos))
-        .slice(0, 5),
+      melhorCasa: [...porMinuto].sort((a, b) => b.pctCasa - a.pctCasa).slice(0, 5),
+      melhorFora: [...porMinuto].sort((a, b) => b.pctFora - a.pctFora).slice(0, 5),
+      maisGols: [...porMinuto].sort((a, b) => b.mediaGols - a.mediaGols).slice(0, 5),
     }
   }, [linhas, colunas])
 
@@ -279,33 +308,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       pct: total > 0 ? Math.round(greens / total * 100) : 0,
       mediaGols: total > 0 ? Math.round(totalGols / total * 10) / 10 : 0,
     }
-  }, [linhas, colunas])
-
-  // Ranking dos melhores times (últimas 20 linhas)
-  const rankingTimes = useMemo(() => {
-    const times: Record<string, { nome: string; vitorias: number; gols: number; jogos: number; golsSofridos: number }> = {}
-    linhas20.forEach(linha => {
-      cols.forEach(col => {
-        const val = linha[col] as string
-        if (!val) return
-        const partes = val.split('</br>')[0].trim()
-        // Formato: "Time A 2 - 1 Time B"
-        const m = partes.match(/^(.+?)\s+(\d+)\s*-\s*(\d+)\s+(.+)$/)
-        if (!m) return
-        const [, timeA, golsA, golsB, timeB] = m
-        const gA = parseInt(golsA), gB = parseInt(golsB)
-        if (!times[timeA]) times[timeA] = { nome: timeA, vitorias: 0, gols: 0, jogos: 0, golsSofridos: 0 }
-        if (!times[timeB]) times[timeB] = { nome: timeB, vitorias: 0, gols: 0, jogos: 0, golsSofridos: 0 }
-        times[timeA].jogos++; times[timeA].gols += gA; times[timeA].golsSofridos += gB
-        times[timeB].jogos++; times[timeB].gols += gB; times[timeB].golsSofridos += gA
-        if (gA > gB) times[timeA].vitorias++
-        else if (gB > gA) times[timeB].vitorias++
-      })
-    })
-    return Object.values(times)
-      .filter(t => t.jogos >= 3)
-      .sort((a, b) => b.vitorias - a.vitorias || b.gols - a.gols)
-      .slice(0, 8)
   }, [linhas, colunas])
 
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
@@ -409,95 +411,88 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         <div style={{ background: '#fff', borderRadius: '6px', padding: '10px 12px' }}>
           {painelAtivo === 'casa' && (
             <>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1a7a3a', letterSpacing: '2px', marginBottom: '8px' }}>MELHORES TIMES — VITÓRIA EM CASA</div>
-              {melhoresParaApostar.melhorCasa.length === 0
-                ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados suficientes</div>
-                : melhoresParaApostar.melhorCasa.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
-                    <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 400 }}>{i+1}. {t.nome}</span>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <span style={{ color: '#666', fontSize: '11px' }}>{t.jogosCasa}j</span>
-                      <span style={{ color: '#1a7a3a', fontWeight: 700 }}>{Math.round(t.vitoriasCasa / t.jogosCasa * 100)}% vitória</span>
-                    </div>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1a7a3a', letterSpacing: '2px', marginBottom: '8px' }}>🏠 MELHORES MINUTOS — VITÓRIA CASA (últ. 20h)</div>
+              {melhoresParaApostar.melhorCasa.map((t, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
+                  <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <span style={{ color: '#666', fontSize: '11px' }}>{t.total}j</span>
+                    <span style={{ color: '#1a7a3a', fontWeight: 700 }}>{t.pctCasa}% casa vence</span>
                   </div>
-                ))
-              }
+                </div>
+              ))}
             </>
           )}
           {painelAtivo === 'fora' && (
             <>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#c0392b', letterSpacing: '2px', marginBottom: '8px' }}>MELHORES TIMES — VITÓRIA FORA DE CASA</div>
-              {melhoresParaApostar.melhorFora.length === 0
-                ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados suficientes</div>
-                : melhoresParaApostar.melhorFora.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
-                    <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 400 }}>{i+1}. {t.nome}</span>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <span style={{ color: '#666', fontSize: '11px' }}>{t.jogosFora}j</span>
-                      <span style={{ color: '#c0392b', fontWeight: 700 }}>{Math.round(t.vitoriasFor / t.jogosFora * 100)}% vitória</span>
-                    </div>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#c0392b', letterSpacing: '2px', marginBottom: '8px' }}>✈️ MELHORES MINUTOS — VITÓRIA FORA (últ. 20h)</div>
+              {melhoresParaApostar.melhorFora.map((t, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
+                  <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <span style={{ color: '#666', fontSize: '11px' }}>{t.total}j</span>
+                    <span style={{ color: '#c0392b', fontWeight: 700 }}>{t.pctFora}% fora vence</span>
                   </div>
-                ))
-              }
+                </div>
+              ))}
             </>
           )}
           {painelAtivo === 'gols' && (
             <>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>TIMES QUE MAIS MARCAM GOLS</div>
-              {melhoresParaApostar.maisGols.length === 0
-                ? <div style={{ fontSize: '11px', color: '#999' }}>Sem dados suficientes</div>
-                : melhoresParaApostar.maisGols.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
-                    <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 400 }}>{i+1}. {t.nome}</span>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                      <span style={{ color: '#666', fontSize: '11px' }}>{t.jogos}j</span>
-                      <span style={{ color: '#1565c0', fontWeight: 700 }}>{(t.gols / t.jogos).toFixed(1)} gols/jogo</span>
-                    </div>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>⚽ MINUTOS COM MAIS GOLS (últ. 20h)</div>
+              {melhoresParaApostar.maisGols.map((t, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid #eee', fontSize: '12px' }}>
+                  <span style={{ color: i < 3 ? '#1565c0' : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <span style={{ color: '#666', fontSize: '11px' }}>{t.total}j</span>
+                    <span style={{ color: '#1565c0', fontWeight: 700 }}>{t.mediaGols} gols/jogo | {t.pctOver}% over2.5</span>
                   </div>
-                ))
-              }
+                </div>
+              ))}
             </>
           )}
         </div>
       </div>
 
-      {/* FILTROS + RANKING + CONFRONTOS */}
+      {/* FILTROS */}
       <div style={{ background: '#ffd600', border: `1px solid #e6c000`, borderRadius: '8px', padding: '12px 16px' }}>
         <div style={{ fontSize: '10px', color: '#333', letterSpacing: '2px', marginBottom: '10px', fontWeight: 700 }}>FILTROS</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center', marginBottom: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>OVER</span>
-            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.over} onChange={e => setFiltros(p => ({ ...p, over: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '50px' }}>OVER</span>
+            <select style={{ flex: 1, background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '8px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.over} onChange={e => setFiltros(p => ({ ...p, over: e.target.value }))}>
               <option value="">—</option>
               {['0.5','1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>UNDER</span>
-            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.under} onChange={e => setFiltros(p => ({ ...p, under: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '50px' }}>UNDER</span>
+            <select style={{ flex: 1, background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '8px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.under} onChange={e => setFiltros(p => ({ ...p, under: e.target.value }))}>
               <option value="">—</option>
               {['1.5','2.5','3.5'].map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>AMBAS</span>
-            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '50px' }}>AMBAS</span>
+            <select style={{ flex: 1, background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '8px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
               <option value="">—</option>
               <option value="sim">Sim</option>
               <option value="nao">Não</option>
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700 }}>RESULTADO</span>
-            <select style={{ background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '6px 10px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '50px' }}>RESULT.</span>
+            <select style={{ flex: 1, background: '#fff', border: `1px solid #ccc`, color: '#111', padding: '8px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
               <option value="">—</option>
               <option value="casa">Casa</option>
               <option value="empate">Empate</option>
               <option value="fora">Fora</option>
             </select>
           </div>
-          <button onClick={aplicar} style={{ background: '#1a7a3a', color: '#fff', border: 'none', padding: '7px 18px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
-          <button onClick={limpar} style={{ background: '#fff', color: '#333', border: `1px solid #ccc`, padding: '7px 14px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={aplicar} style={{ flex: 1, background: '#1a7a3a', color: '#fff', border: 'none', padding: '10px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
+          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: `1px solid #ccc`, padding: '10px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
         </div>
 
         {/* RANKING + CONFRONTOS lado a lado */}
@@ -560,44 +555,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             )
           })()}
 
-          {/* MELHOR VITÓRIA CASA */}
-          {melhoresParaApostar.melhorCasa.length > 0 && (
-            <div style={{ flex: '1', minWidth: '180px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1a7a3a', letterSpacing: '2px', marginBottom: '8px' }}>🏠 VITÓRIA CASA</div>
-              {melhoresParaApostar.melhorCasa.map((t, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
-                  <span style={{ color: '#1a7a3a', fontWeight: 700 }}>{Math.round(t.vitoriasCasa / t.jogosCasa * 100)}%</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* MELHOR VITÓRIA FORA */}
-          {melhoresParaApostar.melhorFora.length > 0 && (
-            <div style={{ flex: '1', minWidth: '180px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#c0392b', letterSpacing: '2px', marginBottom: '8px' }}>✈️ VITÓRIA FORA</div>
-              {melhoresParaApostar.melhorFora.map((t, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
-                  <span style={{ color: '#c0392b', fontWeight: 700 }}>{Math.round(t.vitoriasFor / t.jogosFora * 100)}%</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* MAIS GOLS */}
-          {melhoresParaApostar.maisGols.length > 0 && (
-            <div style={{ flex: '1', minWidth: '180px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>⚽ MAIS GOLS</div>
-              {melhoresParaApostar.maisGols.map((t, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <span style={{ color: '#111', fontWeight: i === 0 ? 700 : 400 }}>{t.nome}</span>
-                  <span style={{ color: '#1565c0', fontWeight: 700 }}>{(t.gols / t.jogos).toFixed(1)}g/j</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
