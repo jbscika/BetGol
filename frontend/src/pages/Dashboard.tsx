@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import GradeResultados from '../components/GradeResultados'
 import IATendencia from '../components/IATendencia'
-import JogosFuturos from '../components/JogosFuturos' // 1. IMPORTADO AQUI
+import JogosFuturos from '../components/JogosFuturos'
 
 const LIGAS: Record<string, string> = {
   'Copa do Mundo': 'copa',
@@ -156,14 +156,8 @@ function Dashboard() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            
-            {/* 1. MANTIDO O COMPONENTE DE TENDÊNCIA */}
             <IATendencia linhas={linhas} colunas={colunas} />
-
-            {/* 2. ENCAIXEI O NOVO COMPONENTE DE PROJEÇÕES AQUI */}
             <JogosFuturos linhas={linhas} colunas={colunas} horas={horas} />
-
-            {/* 3. MANTIDO A GRADE DE RESULTADOS */}
             <GradeResultados
               linhas={linhas}
               colunas={colunas}
