@@ -232,6 +232,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
   const [tipoIA, setTipoIA] = useState<1 | 2 | 3>(1)
   const [mostrarIA, setMostrarIA] = useState(true)
+  const [painelAtivo, setPainelAtivo] = useState<'casa' | 'fora' | 'gols'>('casa')
 
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
@@ -342,8 +343,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
     .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
     .slice(0, 5)
-
-  const [painelAtivo, setPainelAtivo] = useState<'casa' | 'fora' | 'gols'>('casa')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
