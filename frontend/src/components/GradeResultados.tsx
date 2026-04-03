@@ -613,9 +613,11 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           {tipoIA === 1 && '— Análise das últimas 3 linhas (60 partidas)'}
           {tipoIA === 2 && '— Análise das últimas 5 linhas (100 partidas)'}
           {tipoIA === 3 && '— Análise das últimas 8 linhas (160 partidas)'}
-          {!temFiltro && <span style={{ marginLeft: '12px', color: '#b8600c' }}>← Selecione um filtro para ver probabilidade por minuto</span>}
+          {!temFiltro && <span style={{ marginLeft: '12px', color: '#b8600c' }}>Selecione um filtro para ver probabilidade por minuto</span>}
         </div>
       )}
+    </div>
+    </div>
     </div>
   )
 }
