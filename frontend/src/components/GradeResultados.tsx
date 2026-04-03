@@ -494,69 +494,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: `1px solid #ccc`, padding: '10px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
         </div>
 
-        {/* RANKING + CONFRONTOS lado a lado */}
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-
-          {/* RANKING */}
-          {rankingTimes.length > 0 && (
-            <div style={{ flex: '1', minWidth: '280px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>RANKING — ÚLTIMAS 20H</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                <thead>
-                  <tr style={{ background: '#1565c0', color: '#fff' }}>
-                    {['#','TIME','J','V','GM','GS','%V'].map(h => (
-                      <th key={h} style={{ padding: '3px 6px', textAlign: h === 'TIME' ? 'left' : 'center', fontWeight: 600 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rankingTimes.map((t, i) => (
-                    <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '3px 6px', fontWeight: 700, color: i < 3 ? '#1565c0' : '#333', textAlign: 'center' }}>{i + 1}</td>
-                      <td style={{ padding: '3px 6px', fontWeight: 600, color: '#111' }}>{t.nome}</td>
-                      <td style={{ padding: '3px 6px', textAlign: 'center', color: '#333' }}>{t.jogos}</td>
-                      <td style={{ padding: '3px 6px', textAlign: 'center', fontWeight: 700, color: '#1a7a3a' }}>{t.vitorias}</td>
-                      <td style={{ padding: '3px 6px', textAlign: 'center', color: '#1a7a3a', fontWeight: 700 }}>{t.gols}</td>
-                      <td style={{ padding: '3px 6px', textAlign: 'center', color: '#c0392b' }}>{t.golsSofridos}</td>
-                      <td style={{ padding: '3px 6px', textAlign: 'center', fontWeight: 700, color: '#1565c0' }}>{Math.round(t.vitorias / t.jogos * 100)}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* CONFRONTOS FUTUROS */}
-          {linhas.length > 0 && (() => {
-            const proxima = linhas[0]
-            const confrontos: { minuto: string; times: string }[] = []
-            cols.forEach(col => {
-              const val = proxima[col] as string
-              if (!val) return
-              const linha = val.split('</br>')[0].trim()
-              const m = linha.match(/^(.+?)\s+\d+\s*-\s*\d+\s+(.+)$/)
-              if (m) confrontos.push({ minuto: col.replace('tempo', ''), times: `${m[1]} vs ${m[2]}` })
-            })
-            if (confrontos.length === 0) return null
-            return (
-              <div style={{ flex: '1', minWidth: '220px', background: '#fff', border: `1px solid #ccc`, borderRadius: '6px', padding: '10px 12px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: '#1565c0', letterSpacing: '2px', marginBottom: '8px' }}>CONFRONTOS FUTUROS</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {confrontos.map((cf, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0', borderBottom: '1px solid #eee' }}>
-                      <span style={{ color: '#1565c0', fontWeight: 700, fontSize: '11px', minWidth: '30px' }}>{cf.minuto}</span>
-                      <span style={{ color: '#111', fontSize: '11px' }}>{cf.times}</span>
-                      <span style={{ color: '#1a7a3a', fontSize: '10px', marginLeft: 'auto', fontWeight: 700 }}>→ {proximaHora(cf.minuto)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-
-        </div>
-      </div>
-
       {/* MELHORES ENTRADAS */}
       {mostrarIA && melhores.length > 0 && (
         <div style={{ background: '#1a7a3a', border: `1px solid #1a7a3a`, borderRadius: '6px', padding: '6px 10px' }}>
