@@ -57,13 +57,19 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   const linhasComp = linhas.slice(0, qtd)
   const linhasHist = linhas.slice(0, Math.min(linhas.length, 48))
 
-  colunas.forEach(col => {
-    const histCompleto = linhasHist.map(l => extrairPlacar(l[col] as string))
+  // Pre-calcular histMap para correlacao entre colunas
+  const histMap: Record<string, (PlacarInfo | null)[]> = {}
+  colunas.forEach(col => { histMap[col] = linhasHist.map(l => extrairPlacar(l[col] as string)) })
+
+  colunas.forEach((col, colIdx) => {
+    const histCompleto = histMap[col]
     const validos = histCompleto.filter(Boolean) as PlacarInfo[]
     if (validos.length < 5) return
 
     const min = col.replace('tempo', '')
     const n = validos.length
+
+    // === METRICA 1: % historica base ===
     const pO25 = Math.round(validos.filter(p => p.over25).length / n * 100)
     const pO15 = Math.round(validos.filter(p => p.over15).length / n * 100)
     const pO35 = Math.round(validos.filter(p => p.over35).length / n * 100)
@@ -73,6 +79,63 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const pFora = Math.round(validos.filter(p => p.foraVence).length / n * 100)
     const mediaG = Math.round(validos.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
 
+    // === METRICA 2: Peso decrescente nas linhas recentes ===
+    // Linha atual = peso 4, anterior = 3, penultima = 2, antepenultima = 1
+    const pesoTotal = [4, 3, 2, 1].slice(0, Math.min(qtd, linhasComp.length)).reduce((a, b) => a + b, 0)
+    let scoreOver25Ponderado = 0
+    linhasComp.forEach((linha, i) => {
+      const p = extrairPlacar(linha[col] as string)
+      const peso = [4, 3, 2, 1][i] || 1
+      if (p) scoreOver25Ponderado += (p.over25 ? 1 : 0) * peso
+    })
+    const pctPonderado = pesoTotal > 0 ? Math.round(scoreOver25Ponderado / pesoTotal * 100) : pO25
+
+    // === METRICA 3: Deteccao de ciclo ===
+    let mudancas = 0
+    let prevState = histCompleto[0]?.over25
+    for (let i = 1; i < Math.min(histCompleto.length, 24); i++) {
+      const p = histCompleto[i]
+      if (!p) continue
+      if (p.over25 !== prevState) { mudancas++; prevState = p.over25 }
+    }
+    const cicloMedio = mudancas > 0 ? Math.round(24 / mudancas) : 0
+
+    // Contar sequencia atual
+    let seqAtual = 0
+    let dirAtual: boolean | null = null
+    for (const p of histCompleto) {
+      if (!p) continue
+      if (dirAtual === null) { dirAtual = p.over25; seqAtual = 1 }
+      else if (p.over25 === dirAtual) seqAtual++
+      else break
+    }
+
+    // === METRICA 4: Correlacao com coluna anterior ===
+    let corrBoost = 0
+    if (colIdx > 0) {
+      const colAnt = colunas[colIdx - 1]
+      const histAnt = histMap[colAnt]
+      let concord = 0, tot = 0
+      for (let i = 0; i < Math.min(histCompleto.length, histAnt.length, 24); i++) {
+        const a = histAnt[i], b = histCompleto[i]
+        if (!a || !b) continue
+        tot++
+        if (!a.over25 && b.over25) concord++
+      }
+      const pCorr = tot > 0 ? concord / tot : 0
+      if (histAnt[0] && !histAnt[0].over25 && pCorr > 0.55) corrBoost = Math.round(pCorr * 15)
+    }
+
+    // === METRICA 5: Analise por faixa horaria ===
+    // Dividir historico em 3 faixas: recente (0-8), medio (8-24), antigo (24-48)
+    const faixaRecente = histCompleto.slice(0, 8).filter(Boolean) as PlacarInfo[]
+    const faixaMedio = histCompleto.slice(8, 24).filter(Boolean) as PlacarInfo[]
+    const pctRecente = faixaRecente.length > 0 ? Math.round(faixaRecente.filter(p => p.over25).length / faixaRecente.length * 100) : pO25
+    const pctMedio = faixaMedio.length > 0 ? Math.round(faixaMedio.filter(p => p.over25).length / faixaMedio.length * 100) : pO25
+    // Tendencia: se recente < medio = over esta "devendo"
+    const tendFaixas = pctMedio - pctRecente // positivo = over devendo
+
+    // === SCORE COMPOSTO (Metrica 6) ===
     const placares = linhasComp.map(l => extrairPlacar(l[col] as string))
     const atual = placares[0]
     if (!atual) return
@@ -80,47 +143,62 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     let boost = 0
     let motivo = ''
 
+    // Boost por padrao de linhas (peso decrescente)
+    const desvio = pctPonderado - pO25
+    if (desvio < -15) boost += 18
+    else if (desvio < -8) boost += 10
+    else if (desvio > 15) boost -= 15
+    else if (desvio > 8) boost -= 8
+
+    // Boost por ciclo
+    if (cicloMedio > 0 && seqAtual >= cicloMedio) {
+      const fatorCiclo = Math.min((seqAtual - cicloMedio + 1) * 8, 22)
+      boost += dirAtual ? -fatorCiclo : fatorCiclo
+      motivo = 'Ciclo:' + cicloMedio + ' Seq:' + seqAtual
+    }
+
+    // Boost por faixas horarias
+    if (tendFaixas > 15) boost += 12
+    else if (tendFaixas > 8) boost += 6
+    else if (tendFaixas < -15) boost -= 10
+
+    // Boost por correlacao com coluna anterior
+    boost += corrBoost
+
+    // Boost por tipo IA (padrao de linhas recentes)
     if (tipoIA === 1) {
       const ant = placares[1]
       if (ant) {
-        if (atual.over25 === ant.over25) {
-          boost = atual.over25 ? -12 : 12
-          motivo = atual.over25 ? '2xGREEN->reversao' : '2xRED->correcao'
-        } else {
-          boost = atual.over25 ? 8 : -8
-          motivo = 'Alternando'
-        }
+        if (atual.over25 === ant.over25) { boost += atual.over25 ? -8 : 10; motivo += '|2igual' }
+        else { boost += atual.over25 ? 5 : -5; motivo += '|alternando' }
       }
     } else if (tipoIA === 2) {
-      const ant1 = placares[1]
-      const ant2 = placares[2]
+      const ant1 = placares[1], ant2 = placares[2]
       if (ant1 && ant2) {
-        const res = [ant2.over25, ant1.over25, atual.over25]
-        const reds = res.filter(r => !r).length
-        const greens = res.filter(r => r).length
-        if (reds === 3) { boost = 20; motivo = '3xRED->correcao forte' }
-        else if (greens === 3) { boost = -18; motivo = '3xGREEN->reversao' }
-        else if (ant1.over25 === atual.over25) { boost = atual.over25 ? -8 : 10; motivo = '2 iguais->reversao' }
-        else { motivo = 'Misto' }
+        const reds = [ant2.over25, ant1.over25, atual.over25].filter(r => !r).length
+        const greens = 3 - reds
+        if (reds === 3) { boost += 18; motivo += '|3xRED' }
+        else if (greens === 3) { boost -= 16; motivo += '|3xGREEN' }
+        else if (ant1.over25 === atual.over25) { boost += atual.over25 ? -7 : 9; motivo += '|2igual' }
       }
     } else {
-      const ant1 = placares[1]
-      const ant2 = placares[2]
-      const ant3 = placares[3]
+      const ant1 = placares[1], ant2 = placares[2], ant3 = placares[3]
       if (ant1 && ant2 && ant3) {
-        const res = [ant3.over25, ant2.over25, ant1.over25, atual.over25]
-        const reds = res.filter(r => !r).length
-        const greens = res.filter(r => r).length
-        const mgRec = [ant3, ant2, ant1, atual].reduce((s, p) => s + p.gols, 0) / 4
-        if (reds === 4) { boost = 25; motivo = '4xRED->correcao provavel' }
-        else if (greens === 4) { boost = -20; motivo = '4xGREEN->reversao provavel' }
-        else if (reds === 3) { boost = 18; motivo = '3/4 RED->correcao' }
-        else if (greens === 3) { boost = -15; motivo = '3/4 GREEN->reversao' }
-        else { boost = atual.over25 ? -5 : 5; motivo = reds + 'R/' + greens + 'G' }
-        if (mgRec > mediaG + 0.5) boost -= 5
-        if (mgRec < mediaG - 0.5) boost += 5
+        const reds = [ant3.over25, ant2.over25, ant1.over25, atual.over25].filter(r => !r).length
+        const greens = 4 - reds
+        if (reds === 4) { boost += 22; motivo += '|4xRED' }
+        else if (greens === 4) { boost -= 18; motivo += '|4xGREEN' }
+        else if (reds === 3) { boost += 14; motivo += '|3/4RED' }
+        else if (greens === 3) { boost -= 12; motivo += '|3/4GREEN' }
       }
     }
+
+    // Ajuste por media de gols
+    if (mediaG > 3.0) boost -= 5
+    if (mediaG < 1.5) boost += 5
+
+    // Limitar boost total
+    boost = Math.max(-30, Math.min(30, boost))
 
     const baseO25 = Math.min(Math.max(pO25 + boost, 10), 93)
     let mercado = '', prob = 0, conf = 55
@@ -136,13 +214,13 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       if (filtroAtivo.resultado) partes.push(filtroAtivo.resultado.toUpperCase())
       mercado = partes.join(' + ')
       prob = Math.min(Math.max(pct + boost, 10), 93)
-      conf = Math.abs(boost) > 18 ? 90 : Math.abs(boost) > 10 ? 80 : Math.abs(prob - 50) > 20 ? 70 : 55
+      conf = Math.abs(boost) > 20 ? 92 : Math.abs(boost) > 14 ? 82 : Math.abs(boost) > 8 ? 72 : Math.abs(prob - 50) > 20 ? 65 : 55
     } else {
       const opcoes = [
         { nome: 'OVER 1.5', prob: Math.min(pO15, 95) },
         { nome: 'OVER 2.5', prob: baseO25 },
         { nome: 'UNDER 2.5', prob: Math.min(100 - baseO25, 93) },
-        { nome: 'OVER 3.5', prob: Math.min(pO35 + (atual.gols > 3 ? 8 : 0), 88) },
+        { nome: 'OVER 3.5', prob: Math.min(pO35 + (mediaG > 3 ? 8 : 0), 88) },
         { nome: 'AMBAS SIM', prob: Math.min(pAmbas + (boost > 10 ? 10 : 0), 92) },
         { nome: 'CASA', prob: pCasa },
         { nome: 'EMPATE', prob: pEmp },
@@ -150,8 +228,10 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       ].sort((a, b) => b.prob - a.prob)
       mercado = opcoes[0].nome
       prob = Math.round(opcoes[0].prob)
-      conf = Math.abs(boost) > 18 ? 90 : Math.abs(boost) > 10 ? 80 : Math.abs(prob - 50) > 20 ? 70 : 55
+      conf = Math.abs(boost) > 20 ? 92 : Math.abs(boost) > 14 ? 82 : Math.abs(boost) > 8 ? 72 : Math.abs(prob - 50) > 20 ? 65 : 55
     }
+
+    if (!motivo) motivo = 'Hist:' + pO25 + '% Pond:' + pctPonderado + '% Tend:' + (tendFaixas > 0 ? '+' : '') + tendFaixas + '%'
 
     resultado.push({ minuto: min, mercado, probabilidade: Math.round(prob), confianca: conf, motivo })
   })
@@ -164,6 +244,14 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const [tipoIA, setTipoIA] = useState<1 | 2 | 3>(1)
   const [mostrarIA, setMostrarIA] = useState(true)
   const [painelAtivo, setPainelAtivo] = useState<'casa' | 'fora' | 'gols'>('casa')
+  const [alertaSom, setAlertaSom] = useState(true)
+  const [agora, setAgora] = useState(new Date())
+
+  // Atualizar relogio a cada segundo para countdown
+  useState(() => {
+    const timer = setInterval(() => setAgora(new Date()), 1000)
+    return () => clearInterval(timer)
+  })
 
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
@@ -242,8 +330,9 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
 
-  const horaAtualBet = horas && horas.length > 0 ? parseInt(String(horas[0])) : new Date().getHours()
-  const minAtual = new Date().getMinutes()
+  const horaAtualBet = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
+  const minAtual = agora.getMinutes()
+  const segAtual = agora.getSeconds()
 
   function proximaHora(minuto: string): string {
     const minNum = parseInt(minuto)
@@ -254,6 +343,34 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   function horaLinha(idx: number): string {
     if (horas && horas.length > idx) return String(horas[idx]).padStart(2, '0')
     return String((horaAtualBet - idx + 24) % 24).padStart(2, '0')
+  }
+
+  // Countdown ate proximo jogo de um minuto
+  function countdown(minuto: string): string {
+    const minNum = parseInt(minuto)
+    let diffMin = minNum - minAtual
+    if (diffMin <= 0) diffMin += 60
+    const diffSeg = diffMin * 60 - segAtual
+    const m = Math.floor(diffSeg / 60)
+    const s = diffSeg % 60
+    return m + ':' + String(s).padStart(2, '0')
+  }
+
+  // Alerta sonoro quando nova entrada de alta confianca aparece
+  function tocarAlerta() {
+    if (!alertaSom) return
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = 880
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + 0.5)
+    } catch (e) {}
   }
 
   const verde = '#1a7a3a', vermelho = '#c0392b', azul = '#1565c0'
@@ -407,15 +524,23 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             <span style={{ fontSize: '11px', fontWeight: 800, color: '#fff' }}>MELHORES ENTRADAS - PROXIMA PARTIDA</span>
             <span style={{ fontSize: '10px', color: '#ccffcc' }}>IA TIPO {tipoIA}</span>
             {liga && <span style={{ fontSize: '10px', background: '#ffffff33', color: '#fff', borderRadius: '3px', padding: '1px 6px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
+            <button onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? '#fff' : '#ffffff44', color: alertaSom ? verde : '#fff', border: 'none', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
+              {alertaSom ? 'SOM ON' : 'SOM OFF'}
+            </button>
           </div>
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
             {melhores.map((t, i) => (
               <div key={i} style={{ background: '#fff', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px', flex: '1', minWidth: '90px' }}>
-                <div style={{ fontSize: '9px', color: '#333' }}>MIN {t.minuto} <span style={{ color: azul, fontWeight: 700 }}>-&gt; {proximaHora(t.minuto)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '9px', color: '#333' }}>MIN {t.minuto}</span>
+                  <span style={{ fontSize: '9px', color: azul, fontWeight: 700 }}>{proximaHora(t.minuto)}</span>
+                </div>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: '#111' }}>{t.mercado}</div>
                 <div style={{ fontSize: '15px', fontWeight: 800, color: azul, fontFamily: 'monospace', lineHeight: '1.1' }}>{t.probabilidade}%</div>
                 <div style={{ fontSize: '9px', color: verde, fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '9px', color: '#666' }}>{t.motivo}</div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: vermelho, fontFamily: 'monospace' }}>
+                  {countdown(t.minuto)}
+                </div>
               </div>
             ))}
           </div>
