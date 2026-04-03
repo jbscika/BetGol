@@ -102,11 +102,11 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         if (seguindo) {
           // Mesma direção — possível reversão na próxima
           boost = atual.over25 ? -12 : 12
-          padraoDesc = `2L iguais(${atual.over25 ? 'GG' : 'RR'})→reversão`
+          padraoDesc = `2L iguais(${atual.over25 ? 'GG' : 'RR'})->reversao`
         } else {
           // Direções opostas — alternando, seguir o atual
           boost = atual.over25 ? 8 : -8
-          padraoDesc = `Alternando→${atual.over25 ? 'G' : 'R'}`
+          padraoDesc = `Alternando->${atual.over25 ? 'G' : 'R'}`
         }
         if (varGols > 1) boost += 5
         if (varGols < -1) boost -= 5
@@ -124,21 +124,21 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         const tendenciaOver = ant2.over25 && ant1.over25 && atual.over25 // 3 GREEN
 
         if (tendenciaOver) {
-          boost = -18 // 3 greens seguidos → reversão esperada
-          padraoDesc = '3xGREEN→reversão'
+          boost = -18 // 3 greens seguidos → reversao esperada
+          padraoDesc = '3xGREEN->reversao'
         } else if (tendenciaSubindo) {
-          boost = 20 // 3 reds seguidos → correção forte
-          padraoDesc = '3xRED→correção forte'
+          boost = 20 // 3 reds seguidos → correcao forte
+          padraoDesc = '3xRED->correcao forte'
         } else if (todosIguais) {
           boost = atual.over25 ? -12 : 14
-          padraoDesc = `Padrão uniforme→reversão`
+          padraoDesc = `Padrao uniforme->reversao`
         } else if (ultimosDoisIguais) {
           boost = atual.over25 ? -8 : 10
-          padraoDesc = `2 iguais recentes→reversão`
+          padraoDesc = `2 iguais recentes->reversao`
         } else {
           // Alternando — sem padrão claro
           boost = 0
-          padraoDesc = 'Sem padrão claro'
+          padraoDesc = 'Sem padrao claro'
         }
       }
 
@@ -161,17 +161,17 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         }
 
         if (redsConsec === 4) {
-          boost = 25 // 4 reds = correção muito provável
-          padraoDesc = '4xRED→correção muito provável'
+          boost = 25 // 4 reds = correcao muito provavel
+          padraoDesc = '4xRED->correcao muito provável'
         } else if (greensConsec === 4) {
           boost = -20
-          padraoDesc = '4xGREEN→reversão muito provável'
+          padraoDesc = '4xGREEN->reversao muito provável'
         } else if (redsConsec === 3) {
           boost = 18
-          padraoDesc = '3/4 RED→correção provável'
+          padraoDesc = '3/4 RED->correcao provável'
         } else if (greensConsec === 3) {
           boost = -15
-          padraoDesc = '3/4 GREEN→reversão provável'
+          padraoDesc = '3/4 GREEN->reversao provável'
         } else {
           boost = atual.over25 ? -5 : 5
           padraoDesc = `Misto(${redsConsec}R/${greensConsec}G)`
@@ -506,7 +506,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
             {melhores.map((t, i) => (
               <div key={i} style={{ background: '#ffffff', border: `1px solid #cccccc`, borderRadius: '4px', padding: '4px 8px', flex: '1', minWidth: '90px' }}>
-                <div style={{ fontSize: '9px', color: '#333333' }}>MIN {t.minuto} <span style={{ color: '#1565c0', fontWeight: 700 }}>→ {proximaHora(t.minuto)}</span></div>
+                <div style={{ fontSize: '9px', color: '#333333' }}>MIN {t.minuto} <span style={{ color: '#1565c0', fontWeight: 700 }}>-> {proximaHora(t.minuto)}</span></div>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: '#111111' }}>{t.mercado}</div>
                 <div style={{ fontSize: '15px', fontWeight: 800, color: '#1565c0', fontFamily: 'monospace', lineHeight: 1.1 }}>{t.probabilidade}%</div>
                 <div style={{ fontSize: '9px', color: '#1a7a3a', fontWeight: 700 }}>Conf: {t.confianca}%</div>
