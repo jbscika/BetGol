@@ -405,6 +405,12 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
 
+  // Aplicar filtro automaticamente ao mudar qualquer select
+  function setFiltroAuto(novoFiltro: typeof FILTRO_VAZIO) {
+    setFiltros(novoFiltro)
+    setFiltrosAtivos(novoFiltro)
+  }
+
   const horaAtualBet = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
   const minAtual = agora.getMinutes()
   const segAtual = agora.getSeconds()
@@ -617,7 +623,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           ].map(f => (
             <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>{f.lbl}</span>
-              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros[f.key]} onChange={e => setFiltros(p => ({ ...p, [f.key]: e.target.value }))}>
+              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros[f.key]} onChange={e => setFiltroAuto({ ...filtros, [f.key]: e.target.value })}>
                 <option value="">-</option>
                 {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
@@ -625,7 +631,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>AMBAS</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.ambas} onChange={e => setFiltroAuto({ ...filtros, ambas: e.target.value })}>
               <option value="">-</option>
               <option value="sim">Sim</option>
               <option value="nao">Nao</option>
@@ -633,7 +639,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>RESULT.</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.resultado} onChange={e => setFiltroAuto({ ...filtros, resultado: e.target.value })}>
               <option value="">-</option>
               <option value="casa">Casa</option>
               <option value="empate">Empate</option>
