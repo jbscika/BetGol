@@ -22,17 +22,36 @@ function Dashboard() {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [totalPartidas, setTotalPartidas] = useState(0)
+  const [dadosTodasLigas, setDadosTodasLigas] = useState<Record<string, Partida[]>>({})
 
   useEffect(() => {
     buscarDados()
   }, [ligaSelecionada])
 
   useEffect(() => {
+    buscarTodasLigas()
     const intervalo = setInterval(() => {
       buscarDadosSilencioso()
+      buscarTodasLigas()
     }, 120 * 1000)
     return () => clearInterval(intervalo)
   }, [ligaSelecionada])
+
+  async function buscarTodasLigas() {
+    try {
+      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      const resultados: Record<string, Partida[]> = {}
+      await Promise.all(Object.keys(LIGAS).map(async (liga) => {
+        if (liga === ligaSelecionada) return
+        try {
+          const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(liga)}`)
+          const json = await resp.json()
+          if (json.data?.linhas) resultados[liga] = json.data.linhas
+        } catch {}
+      }))
+      setDadosTodasLigas(resultados)
+    } catch {}
+  }
 
   async function buscarDadosSilencioso() {
     try {
@@ -165,6 +184,7 @@ function Dashboard() {
               liga={ligaSelecionada}
               ligas={Object.keys(LIGAS)}
               onTrocarLiga={setLigaSelecionada}
+              dadosTodasLigas={dadosTodasLigas}
             />
           </div>
         )}
