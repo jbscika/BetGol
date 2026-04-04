@@ -30,10 +30,12 @@ function Dashboard() {
 
   useEffect(() => {
     buscarTodasLigas()
+    // Verifica a cada 30 segundos — cada rodada dura 3 min
+    // Assim fica no maximo 30 segundos atrasado
     const intervalo = setInterval(() => {
       buscarDadosSilencioso()
       buscarTodasLigas()
-    }, 120 * 1000)
+    }, 30 * 1000)
     return () => clearInterval(intervalo)
   }, [ligaSelecionada])
 
