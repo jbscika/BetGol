@@ -273,11 +273,15 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const [alertaSom, setAlertaSom] = useState(true)
   const [agora, setAgora] = useState(new Date())
 
-  // Atualizar relogio a cada segundo para countdown
+  // Atualizar relogio a cada segundo
   useState(() => {
     const timer = setInterval(() => setAgora(new Date()), 1000)
     return () => clearInterval(timer)
   })
+
+  // Horario da Bet365: hora vem da API (horas[0]), minuto/segundo do relogio local
+  // A diferenca e so na hora (fuso horario) - minutos e segundos sao iguais
+  const horaBet365 = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
 
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
@@ -430,21 +434,22 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     setFiltrosAtivos(novoFiltro)
   }
 
-  const horaAtualBet = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
-  const minAtual = agora.getMinutes()
-  const segAtual = agora.getSeconds()
+  // Calcular diferenca de horario entre Bet365 e relogio local
+  // horas[0] = hora atual da Bet365, agora.getHours() = hora local
+  const horaBet = horaBet365
+  const horaAtualBet = horaBet
+  const minAtualBet = agora.getMinutes()
+  const segAtualBet = agora.getSeconds()
 
   function proximaHora(minuto: string): string {
     const minNum = parseInt(minuto)
-    // Se o minuto da partida ainda nao passou nesta hora, acontece nesta hora
-    // Se ja passou, acontece na proxima hora
-    const h = minNum > minAtual ? horaAtualBet : (horaAtualBet + 1) % 24
+    const h = minNum > minAtualBet ? horaAtualBet : (horaAtualBet + 1) % 24
     return String(h).padStart(2, '0') + ':' + String(minNum).padStart(2, '0')
   }
 
   function countdown(minuto: string): string {
     const minNum = parseInt(minuto)
-    let diffSeg = (minNum - minAtual) * 60 - segAtual
+    let diffSeg = (minNum - minAtualBet) * 60 - segAtualBet
     if (diffSeg <= 0) diffSeg += 3600
     const m = Math.floor(diffSeg / 60)
     const s = diffSeg % 60
