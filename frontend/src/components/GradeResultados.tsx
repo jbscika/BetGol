@@ -413,8 +413,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       </div>
 
       {/* PAINEIS - MELHORES MINUTOS */}
-      <div style={{ background: azul, borderRadius: '8px', padding: '6px 10px' }}>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+      <div style={{ background: azul, borderRadius: '8px', padding: '4px 8px' }}>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
           {([
             { key: 'casa' as const, lbl: 'VITORIA CASA' },
             { key: 'fora' as const, lbl: 'VITORIA FORA' },
@@ -430,7 +430,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             </button>
           ))}
         </div>
-        <div style={{ background: '#fff', borderRadius: '6px', padding: '6px 10px' }}>
+        <div style={{ background: '#fff', borderRadius: '6px', padding: '4px 8px' }}>
           {painelAtivo === 'casa' && (
             <div>
               <div style={{ fontSize: '9px', fontWeight: 800, color: verde, marginBottom: '4px' }}>MELHORES MINUTOS - VITORIA CASA (ult. 20h)</div>
@@ -479,14 +479,14 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       {/* FILTROS */}
       <div style={{ background: '#ffd600', borderRadius: '8px', padding: '8px 12px' }}>
         <div style={{ fontSize: '10px', color: '#333', fontWeight: 700, marginBottom: '8px' }}>FILTROS</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '6px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', marginBottom: '4px' }}>
           {[
             { lbl: 'OVER', key: 'over' as const, opts: ['0.5','1.5','2.5','3.5'] },
             { lbl: 'UNDER', key: 'under' as const, opts: ['1.5','2.5','3.5'] },
           ].map(f => (
             <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>{f.lbl}</span>
-              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '2px 4px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '26px' }} value={filtros[f.key]} onChange={e => setFiltros(p => ({ ...p, [f.key]: e.target.value }))}>
+              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros[f.key]} onChange={e => setFiltros(p => ({ ...p, [f.key]: e.target.value }))}>
                 <option value="">-</option>
                 {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
@@ -494,7 +494,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>AMBAS</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '2px 4px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '26px' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
               <option value="">-</option>
               <option value="sim">Sim</option>
               <option value="nao">Nao</option>
@@ -502,7 +502,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>RESULT.</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '2px 4px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '26px' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
               <option value="">-</option>
               <option value="casa">Casa</option>
               <option value="empate">Empate</option>
@@ -511,8 +511,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={aplicar} style={{ flex: 1, background: verde, color: '#fff', border: 'none', padding: '7px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
-          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #ccc', padding: '7px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+          <button onClick={aplicar} style={{ flex: 1, background: verde, color: '#fff', border: 'none', padding: '5px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
+          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #ccc', padding: '5px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
         </div>
       </div>
 
