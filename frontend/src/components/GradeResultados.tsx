@@ -8,6 +8,7 @@ interface Props {
   liga?: string
   ligas?: string[]
   onTrocarLiga?: (liga: string) => void
+  dadosTodasLigas?: Record<string, Partida[]>
 }
 
 interface PlacarInfo {
@@ -213,8 +214,14 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       if (filtroAtivo.ambas === 'nao') partes.push('AMBAS NAO')
       if (filtroAtivo.resultado) partes.push(filtroAtivo.resultado.toUpperCase())
       mercado = partes.join(' + ')
-      prob = Math.min(Math.max(pct + boost, 10), 93)
-      conf = Math.abs(boost) > 20 ? 92 : Math.abs(boost) > 14 ? 82 : Math.abs(boost) > 8 ? 72 : Math.abs(prob - 50) > 20 ? 65 : 55
+      // Prob = % historica pura + boost moderado max +10
+      prob = Math.min(Math.max(pct + Math.min(Math.max(boost, -10), 10), 10), 93)
+      // Confianca baseada na consistencia historica real
+      const dev = Math.abs(pct - 50)
+      conf = n >= 30 && dev > 25 ? 80
+           : n >= 20 && dev > 20 ? 70
+           : n >= 10 && dev > 15 ? 62
+           : 50
     } else {
       const opcoes = [
         { nome: 'OVER 1.5', prob: Math.min(pO15, 95) },
@@ -238,7 +245,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   return resultado
 }
 
-export default function GradeResultados({ linhas, colunas, horas, liga, ligas, onTrocarLiga }: Props) {
+export default function GradeResultados({ linhas, colunas, horas, liga, ligas, onTrocarLiga, dadosTodasLigas }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
   const [tipoIA, setTipoIA] = useState<1 | 2 | 3>(1)
@@ -302,7 +309,69 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     }
   }, [linhas, colunas])
 
-  const tendencias = useMemo(() => {
+  // === ANALISE 4: Cruzamento entre ligas ===
+  // Verificar se outras ligas estao em ciclo oposto (oportunidade de entrada)
+  const cruzamentoLigas = useMemo(() => {
+    if (!dadosTodasLigas || Object.keys(dadosTodasLigas).length === 0) return []
+    const resultado: { liga: string; minuto: string; sinal: string; pct: number }[] = []
+
+    Object.entries(dadosTodasLigas).forEach(([nomeLiga, linhasLiga]) => {
+      if (linhasLiga.length < 5) return
+      cols.forEach(col => {
+        const histLigaAtual = linhas.slice(0, 8).map(l => extrairPlacar(l[col] as string)).filter(Boolean) as PlacarInfo[]
+        const histOutraLiga = linhasLiga.slice(0, 8).map(l => extrairPlacar(l[col] as string)).filter(Boolean) as PlacarInfo[]
+        if (histLigaAtual.length < 3 || histOutraLiga.length < 3) return
+
+        const pctAtual = Math.round(histLigaAtual.filter(p => p.over25).length / histLigaAtual.length * 100)
+        const pctOutra = Math.round(histOutraLiga.filter(p => p.over25).length / histOutraLiga.length * 100)
+
+        // Se as ligas estao em ciclos opostos (diferenca > 40%) - sinal forte
+        if (Math.abs(pctAtual - pctOutra) >= 40) {
+          const min = col.replace('tempo', '')
+          const ligaEmGreen = pctAtual > pctOutra ? (liga || 'atual') : nomeLiga
+          resultado.push({
+            liga: ligaEmGreen,
+            minuto: min,
+            sinal: pctAtual > pctOutra ? 'OVER 2.5' : 'UNDER 2.5',
+            pct: Math.max(pctAtual, pctOutra),
+          })
+        }
+      })
+    })
+
+    return resultado
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 5)
+  }, [linhas, colunas, dadosTodasLigas])
+
+  // === ANALISE 5: Deteccao de anomalia ===
+  // Minutos que sairam completamente fora do padrao historico
+  const anomalias = useMemo(() => {
+    return cols.map(col => {
+      const histCompleto = linhas.slice(0, 48).map(l => extrairPlacar(l[col] as string)).filter(Boolean) as PlacarInfo[]
+      if (histCompleto.length < 10) return null
+
+      const pctHist = Math.round(histCompleto.filter(p => p.over25).length / histCompleto.length * 100)
+      const ultimas3 = histCompleto.slice(0, 3)
+      const pctRecente = Math.round(ultimas3.filter(p => p.over25).length / ultimas3.length * 100)
+
+      const desvio = Math.abs(pctRecente - pctHist)
+      if (desvio < 40) return null // So mostra se desvio for grande
+
+      const min = col.replace('tempo', '')
+      return {
+        minuto: min,
+        pctHistorico: pctHist,
+        pctRecente,
+        desvio,
+        // Se historico e alto mas recente e baixo: over devendo -> apostar OVER
+        mercado: pctHist > 50 && pctRecente < 30 ? 'OVER 2.5' : pctHist < 40 && pctRecente > 70 ? 'UNDER 2.5' : null,
+        forca: desvio >= 60 ? 'FORTE' : 'MEDIA',
+      }
+    }).filter(Boolean).filter(a => a!.mercado !== null)
+      .sort((a, b) => b!.desvio - a!.desvio)
+      .slice(0, 5) as { minuto: string; pctHistorico: number; pctRecente: number; desvio: number; mercado: string; forca: string }[]
+  }, [linhas, colunas])
     if (!mostrarIA || linhas.length < 5) return []
     return calcularIA(linhas, cols, tipoIA, filtrosAtivos)
   }, [linhas, colunas, tipoIA, mostrarIA, filtrosAtivos])
@@ -413,8 +482,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       </div>
 
       {/* PAINEIS - MELHORES MINUTOS */}
-      <div style={{ background: azul, borderRadius: '8px', padding: '6px 10px' }}>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+      <div style={{ background: azul, borderRadius: '8px', padding: '4px 8px' }}>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
           {([
             { key: 'casa' as const, lbl: 'VITORIA CASA' },
             { key: 'fora' as const, lbl: 'VITORIA FORA' },
@@ -430,13 +499,16 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             </button>
           ))}
         </div>
-        <div style={{ background: '#fff', borderRadius: '6px', padding: '6px 10px' }}>
+        <div style={{ background: '#fff', borderRadius: '6px', padding: '4px 8px' }}>
           {painelAtivo === 'casa' && (
             <div>
               <div style={{ fontSize: '9px', fontWeight: 800, color: verde, marginBottom: '4px' }}>MELHORES MINUTOS - VITORIA CASA (ult. 20h)</div>
               {melhoresParaApostar.melhorCasa.map((t, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                    <span style={{ color: '#999', fontSize: '10px' }}>{proximaHora(t.min)}</span>
+                  </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <span style={{ color: '#666', fontSize: '10px' }}>{t.total}j</span>
                     <span style={{ color: verde, fontWeight: 700 }}>{t.pctCasa}% casa vence</span>
@@ -450,7 +522,10 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
               <div style={{ fontSize: '9px', fontWeight: 800, color: vermelho, marginBottom: '4px' }}>MELHORES MINUTOS - VITORIA FORA (ult. 20h)</div>
               {melhoresParaApostar.melhorFora.map((t, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                    <span style={{ color: '#999', fontSize: '10px' }}>{proximaHora(t.min)}</span>
+                  </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <span style={{ color: '#666', fontSize: '10px' }}>{t.total}j</span>
                     <span style={{ color: vermelho, fontWeight: 700 }}>{t.pctFora}% fora vence</span>
@@ -464,7 +539,10 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
               <div style={{ fontSize: '9px', fontWeight: 800, color: azul, marginBottom: '4px' }}>MINUTOS COM MAIS GOLS (ult. 20h)</div>
               {melhoresParaApostar.maisGols.map((t, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
+                    <span style={{ color: '#999', fontSize: '10px' }}>{proximaHora(t.min)}</span>
+                  </div>
                   <div style={{ display: 'flex', gap: '10px' }}>
                     <span style={{ color: '#666', fontSize: '10px' }}>{t.total}j</span>
                     <span style={{ color: azul, fontWeight: 700 }}>{t.mediaGols} gols/j | {t.pctOver}% over2.5</span>
@@ -476,17 +554,64 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </div>
       </div>
 
+      {/* ANALISE 5: ANOMALIAS */}
+      {anomalias.length > 0 && (
+        <div style={{ background: '#fff3e0', border: '2px solid #ff9800', borderRadius: '8px', padding: '8px 12px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: '#e65100', marginBottom: '6px', letterSpacing: '1px' }}>
+            ANOMALIA DETECTADA - MERCADO FORA DO PADRAO
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {anomalias.map((a, i) => (
+              <div key={i} style={{ background: '#fff', border: '1px solid #ff9800', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: azul }}>MIN {a.minuto}</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: a.forca === 'FORTE' ? vermelho : '#e65100', background: a.forca === 'FORTE' ? '#fde8e8' : '#fff3e0', borderRadius: '3px', padding: '1px 5px' }}>{a.forca}</span>
+                </div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: verde }}>{a.mercado}</div>
+                <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
+                  Hist: {a.pctHistorico}% | Recente: {a.pctRecente}% | Desvio: {a.desvio}%
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '9px', color: '#e65100', marginTop: '6px' }}>
+            Minutos onde o resultado recente diverge fortemente do historico - correcao esperada
+          </div>
+        </div>
+      )}
+
+      {/* ANALISE 4: CRUZAMENTO ENTRE LIGAS */}
+      {cruzamentoLigas.length > 0 && (
+        <div style={{ background: '#f3e5f5', border: '2px solid #9c27b0', borderRadius: '8px', padding: '8px 12px' }}>
+          <div style={{ fontSize: '10px', fontWeight: 800, color: '#6a1b9a', marginBottom: '6px', letterSpacing: '1px' }}>
+            CRUZAMENTO DE LIGAS - CICLOS OPOSTOS DETECTADOS
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {cruzamentoLigas.map((c2, i) => (
+              <div key={i} style={{ background: '#fff', border: '1px solid #9c27b0', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#6a1b9a', marginBottom: '2px' }}>{c2.liga}</div>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: verde }}>{c2.sinal}</div>
+                <div style={{ fontSize: '9px', color: '#666' }}>MIN {c2.minuto} | {c2.pct}% recente</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: '9px', color: '#6a1b9a', marginTop: '6px' }}>
+            Ligas em ciclos opostos - entrada na liga em GREEN quando a outra esta em RED
+          </div>
+        </div>
+      )}
+
       {/* FILTROS */}
       <div style={{ background: '#ffd600', borderRadius: '8px', padding: '8px 12px' }}>
         <div style={{ fontSize: '10px', color: '#333', fontWeight: 700, marginBottom: '8px' }}>FILTROS</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '6px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', marginBottom: '4px' }}>
           {[
             { lbl: 'OVER', key: 'over' as const, opts: ['0.5','1.5','2.5','3.5'] },
             { lbl: 'UNDER', key: 'under' as const, opts: ['1.5','2.5','3.5'] },
           ].map(f => (
             <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>{f.lbl}</span>
-              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '2px 4px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '26px' }} value={filtros[f.key]} onChange={e => setFiltros(p => ({ ...p, [f.key]: e.target.value }))}>
+              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros[f.key]} onChange={e => setFiltros(p => ({ ...p, [f.key]: e.target.value }))}>
                 <option value="">-</option>
                 {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
@@ -494,7 +619,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>AMBAS</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '2px 4px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '26px' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
               <option value="">-</option>
               <option value="sim">Sim</option>
               <option value="nao">Nao</option>
@@ -502,7 +627,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>RESULT.</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '2px 4px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '26px' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
               <option value="">-</option>
               <option value="casa">Casa</option>
               <option value="empate">Empate</option>
@@ -511,8 +636,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={aplicar} style={{ flex: 1, background: verde, color: '#fff', border: 'none', padding: '7px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
-          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #ccc', padding: '7px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+          <button onClick={aplicar} style={{ flex: 1, background: verde, color: '#fff', border: 'none', padding: '5px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
+          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #ccc', padding: '5px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
         </div>
       </div>
 
