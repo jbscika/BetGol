@@ -277,7 +277,13 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     let total = 0, greens = 0
     linhas20.forEach(linha => {
       const p = extrairPlacar(linha[col] as string)
-      if (p) { total++; if (!temFiltro || passaFiltro(p, filtrosAtivos)) if (p.over25) greens++ }
+      if (!p) return
+      total++
+      if (!temFiltro) {
+        if (p.over25) greens++
+      } else {
+        if (passaFiltro(p, filtrosAtivos)) greens++
+      }
     })
     return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
   }), [linhas, colunas, filtrosAtivos])
@@ -405,24 +411,24 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
 
   function proximaHora(minuto: string): string {
     const minNum = parseInt(minuto)
+    // Se o minuto da partida ainda nao passou nesta hora, acontece nesta hora
+    // Se ja passou, acontece na proxima hora
     const h = minNum > minAtual ? horaAtualBet : (horaAtualBet + 1) % 24
     return String(h).padStart(2, '0') + ':' + String(minNum).padStart(2, '0')
+  }
+
+  function countdown(minuto: string): string {
+    const minNum = parseInt(minuto)
+    let diffSeg = (minNum - minAtual) * 60 - segAtual
+    if (diffSeg <= 0) diffSeg += 3600
+    const m = Math.floor(diffSeg / 60)
+    const s = diffSeg % 60
+    return m + ':' + String(s).padStart(2, '0')
   }
 
   function horaLinha(idx: number): string {
     if (horas && horas.length > idx) return String(horas[idx]).padStart(2, '0')
     return String((horaAtualBet - idx + 24) % 24).padStart(2, '0')
-  }
-
-  // Countdown ate proximo jogo de um minuto
-  function countdown(minuto: string): string {
-    const minNum = parseInt(minuto)
-    let diffMin = minNum - minAtual
-    if (diffMin <= 0) diffMin += 60
-    const diffSeg = diffMin * 60 - segAtual
-    const m = Math.floor(diffSeg / 60)
-    const s = diffSeg % 60
-    return m + ':' + String(s).padStart(2, '0')
   }
 
   // Alerta sonoro quando nova entrada de alta confianca aparece
