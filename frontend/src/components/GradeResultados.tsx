@@ -223,19 +223,38 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
            : n >= 10 && dev > 15 ? 62
            : 50
     } else {
-      const opcoes = [
-        { nome: 'OVER 1.5', prob: Math.min(pO15, 95) },
-        { nome: 'OVER 2.5', prob: baseO25 },
-        { nome: 'UNDER 2.5', prob: Math.min(100 - baseO25, 93) },
-        { nome: 'OVER 3.5', prob: Math.min(pO35 + (mediaG > 3 ? 8 : 0), 88) },
-        { nome: 'AMBAS SIM', prob: Math.min(pAmbas + (boost > 10 ? 10 : 0), 92) },
-        { nome: 'CASA', prob: pCasa },
-        { nome: 'EMPATE', prob: pEmp },
-        { nome: 'FORA', prob: pFora },
-      ].sort((a, b) => b.prob - a.prob)
-      mercado = opcoes[0].nome
-      prob = Math.round(opcoes[0].prob)
-      conf = Math.abs(boost) > 20 ? 92 : Math.abs(boost) > 14 ? 82 : Math.abs(boost) > 8 ? 72 : Math.abs(prob - 50) > 20 ? 65 : 55
+      // Escolher UM mercado claro - com vantagem minima de 15% sobre o oposto
+      // Over vs Under: escolhe o que tiver maior vantagem historica
+      const overProb = baseO25
+      const underProb = 100 - baseO25
+
+      // So considera over se vantagem clara (>15% acima de 50)
+      // So considera under se vantagem clara (>15% acima de 50)
+      const opcoes: { nome: string; prob: number; vantagem: number }[] = []
+
+      if (overProb > underProb && overProb > 55) {
+        opcoes.push({ nome: 'OVER 2.5', prob: overProb, vantagem: overProb - 50 })
+      } else if (underProb > overProb && underProb > 55) {
+        opcoes.push({ nome: 'UNDER 2.5', prob: underProb, vantagem: underProb - 50 })
+      }
+
+      if (pO15 > 70) opcoes.push({ nome: 'OVER 1.5', prob: pO15, vantagem: pO15 - 50 })
+      if (pO35 > 55) opcoes.push({ nome: 'OVER 3.5', prob: Math.min(pO35 + (mediaG > 3 ? 8 : 0), 88), vantagem: pO35 - 50 })
+      if (pAmbas > 60) opcoes.push({ nome: 'AMBAS SIM', prob: Math.min(pAmbas + (boost > 10 ? 8 : 0), 92), vantagem: pAmbas - 50 })
+      if (pCasa > 60) opcoes.push({ nome: 'CASA', prob: pCasa, vantagem: pCasa - 50 })
+      if (pFora > 55) opcoes.push({ nome: 'FORA', prob: pFora, vantagem: pFora - 50 })
+
+      if (opcoes.length === 0) {
+        // Sem padrao claro - nao exibir nas melhores entradas
+        mercado = overProb >= underProb ? 'OVER 2.5' : 'UNDER 2.5'
+        prob = Math.max(overProb, underProb)
+        conf = 40 // baixa confianca - nao vai aparecer nas melhores entradas
+      } else {
+        opcoes.sort((a, b) => b.vantagem - a.vantagem)
+        mercado = opcoes[0].nome
+        prob = Math.round(opcoes[0].prob)
+        conf = Math.abs(boost) > 20 ? 90 : Math.abs(boost) > 14 ? 80 : Math.abs(boost) > 8 ? 70 : opcoes[0].vantagem > 25 ? 72 : opcoes[0].vantagem > 15 ? 62 : 50
+      }
     }
 
     if (!motivo) motivo = 'Hist:' + pO25 + '% Pond:' + pctPonderado + '% Tend:' + (tendFaixas > 0 ? '+' : '') + tendFaixas + '%'
@@ -398,7 +417,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   }, [linhas, colunas])
 
   const melhores = tendencias
-    .filter(t => t.probabilidade >= 60 && t.confianca >= 65)
+    .filter(t => t.probabilidade >= 65 && t.confianca >= 65)
     .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
     .slice(0, 5)
 
