@@ -477,32 +477,32 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       </div>
 
       {/* FILTROS */}
-      <div style={{ background: '#ffd600', borderRadius: '8px', padding: '12px 16px' }}>
-        <div style={{ fontSize: '10px', color: '#333', fontWeight: 700, marginBottom: '10px' }}>FILTROS</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '10px' }}>
+      <div style={{ background: '#ffd600', borderRadius: '8px', padding: '8px 12px' }}>
+        <div style={{ fontSize: '10px', color: '#333', fontWeight: 700, marginBottom: '8px' }}>FILTROS</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '6px' }}>
           {[
             { lbl: 'OVER', key: 'over' as const, opts: ['0.5','1.5','2.5','3.5'] },
             { lbl: 'UNDER', key: 'under' as const, opts: ['1.5','2.5','3.5'] },
           ].map(f => (
             <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '45px' }}>{f.lbl}</span>
-              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '8px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros[f.key]} onChange={e => setFiltros(p => ({ ...p, [f.key]: e.target.value }))}>
+              <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>{f.lbl}</span>
+              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '4px 6px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '30px' }} value={filtros[f.key]} onChange={e => setFiltros(p => ({ ...p, [f.key]: e.target.value }))}>
                 <option value="">-</option>
                 {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '45px' }}>AMBAS</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '8px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>AMBAS</span>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '4px 6px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '30px' }} value={filtros.ambas} onChange={e => setFiltros(p => ({ ...p, ambas: e.target.value }))}>
               <option value="">-</option>
               <option value="sim">Sim</option>
               <option value="nao">Nao</option>
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '45px' }}>RESULT.</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '8px', fontSize: '13px', borderRadius: '4px', outline: 'none' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
+            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>RESULT.</span>
+            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '4px 6px', fontSize: '12px', borderRadius: '4px', outline: 'none', height: '30px' }} value={filtros.resultado} onChange={e => setFiltros(p => ({ ...p, resultado: e.target.value }))}>
               <option value="">-</option>
               <option value="casa">Casa</option>
               <option value="empate">Empate</option>
@@ -511,8 +511,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={aplicar} style={{ flex: 1, background: verde, color: '#fff', border: 'none', padding: '10px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
-          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #ccc', padding: '10px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+          <button onClick={aplicar} style={{ flex: 1, background: verde, color: '#fff', border: 'none', padding: '7px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
+          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #ccc', padding: '7px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
         </div>
       </div>
 
