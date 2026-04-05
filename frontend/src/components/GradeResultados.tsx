@@ -48,17 +48,21 @@ function passaFiltro(p: PlacarInfo, f: typeof FILTRO_VAZIO): boolean {
   return true
 }
 
+function oddParaProb(odd: string): number {
+  const parts = odd.split('/')
+  if (parts.length !== 2) return 50
+  const num = parseInt(parts[0]), den = parseInt(parts[1])
+  if (isNaN(num) || isNaN(den) || den === 0) return 50
+  return Math.round(den / (num + den) * 100)
+}
+
 function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtroAtivo: typeof FILTRO_VAZIO): Tendencia[] {
   const resultado: Tendencia[] = []
   const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
-  // Tipo 1: atual vs 1 anterior (2 linhas)
-  // Tipo 2: atual + 2 anteriores (3 linhas)
-  // Tipo 3: atual + 3 anteriores (4 linhas)
   const qtd = tipoIA === 1 ? 2 : tipoIA === 2 ? 3 : 4
   const linhasComp = linhas.slice(0, qtd)
   const linhasHist = linhas.slice(0, Math.min(linhas.length, 48))
 
-  // Pre-calcular histMap para correlacao entre colunas
   const histMap: Record<string, (PlacarInfo | null)[]> = {}
   colunas.forEach(col => { histMap[col] = linhasHist.map(l => extrairPlacar(l[col] as string)) })
 
@@ -70,7 +74,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const min = col.replace('tempo', '')
     const n = validos.length
 
-    // === METRICA 1: % historica base ===
+    // % historica base
     const pO25 = Math.round(validos.filter(p => p.over25).length / n * 100)
     const pO15 = Math.round(validos.filter(p => p.over15).length / n * 100)
     const pO35 = Math.round(validos.filter(p => p.over35).length / n * 100)
@@ -79,31 +83,36 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const pEmp = Math.round(validos.filter(p => p.empate).length / n * 100)
     const pFora = Math.round(validos.filter(p => p.foraVence).length / n * 100)
     const mediaG = Math.round(validos.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
+    const mediaGols2 = validos.reduce((s, p) => s + p.gols * p.gols, 0) / n
+    const varGols = mediaGols2 - mediaG * mediaG
+    const estabilidade = varGols < 1.5 ? 1.15 : varGols > 3.0 ? 0.85 : 1.0
 
-    // === METRICA 2: Peso decrescente nas linhas recentes ===
-    // Linha atual = peso 4, anterior = 3, penultima = 2, antepenultima = 1
-    const pesoTotal = [4, 3, 2, 1].slice(0, Math.min(qtd, linhasComp.length)).reduce((a, b) => a + b, 0)
-    let scoreOver25Ponderado = 0
-    linhasComp.forEach((linha, i) => {
-      const p = extrairPlacar(linha[col] as string)
-      const peso = [4, 3, 2, 1][i] || 1
-      if (p) scoreOver25Ponderado += (p.over25 ? 1 : 0) * peso
+    // Placares das linhas de comparacao
+    const placares = linhasComp.map(l => extrairPlacar(l[col] as string))
+    const atual = placares[0]
+    if (!atual) return
+
+    // Metrica A: peso decrescente
+    const pesos = [4, 3, 2, 1]
+    let pesoTotal = 0, scoreO25 = 0
+    placares.forEach((p, i) => {
+      if (!p) return
+      const w = pesos[i] || 1
+      pesoTotal += w
+      scoreO25 += (p.over25 ? 1 : 0) * w
     })
-    const pctPonderado = pesoTotal > 0 ? Math.round(scoreOver25Ponderado / pesoTotal * 100) : pO25
+    const pctO25Pond = pesoTotal > 0 ? Math.round(scoreO25 / pesoTotal * 100) : pO25
+    const desvPond = pctO25Pond - pO25
 
-    // === METRICA 3: Deteccao de ciclo ===
+    // Metrica B: ciclo
     let mudancas = 0
     let prevState = histCompleto[0]?.over25
-    for (let i = 1; i < Math.min(histCompleto.length, 24); i++) {
-      const p = histCompleto[i]
-      if (!p) continue
+    for (let i = 1; i < Math.min(n, 24); i++) {
+      const p = histCompleto[i]; if (!p) continue
       if (p.over25 !== prevState) { mudancas++; prevState = p.over25 }
     }
     const cicloMedio = mudancas > 0 ? Math.round(24 / mudancas) : 0
-
-    // Contar sequencia atual
-    let seqAtual = 0
-    let dirAtual: boolean | null = null
+    let seqAtual = 0, dirAtual: boolean | null = null
     for (const p of histCompleto) {
       if (!p) continue
       if (dirAtual === null) { dirAtual = p.over25; seqAtual = 1 }
@@ -111,102 +120,94 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       else break
     }
 
-    // === METRICA 4: Correlacao com coluna anterior ===
+    // Metrica C: variacao por faixa temporal (3 faixas)
+    const f1 = histCompleto.slice(0, 6).filter(Boolean) as PlacarInfo[]
+    const f3 = histCompleto.slice(18, 36).filter(Boolean) as PlacarInfo[]
+    const pF1 = f1.length > 0 ? f1.filter(p => p.over25).length / f1.length * 100 : pO25
+    const pF3 = f3.length > 0 ? f3.filter(p => p.over25).length / f3.length * 100 : pO25
+    const tendencia = pF3 - pF1
+
+    // Metrica D: correlacao com minuto anterior
     let corrBoost = 0
     if (colIdx > 0) {
-      const colAnt = colunas[colIdx - 1]
-      const histAnt = histMap[colAnt]
+      const histAnt = histMap[colunas[colIdx - 1]]
       let concord = 0, tot = 0
-      for (let i = 0; i < Math.min(histCompleto.length, histAnt.length, 24); i++) {
+      for (let i = 0; i < Math.min(n, histAnt.length, 24); i++) {
         const a = histAnt[i], b = histCompleto[i]
-        if (!a || !b) continue
-        tot++
+        if (!a || !b) continue; tot++
         if (!a.over25 && b.over25) concord++
       }
       const pCorr = tot > 0 ? concord / tot : 0
-      if (histAnt[0] && !histAnt[0].over25 && pCorr > 0.55) corrBoost = Math.round(pCorr * 15)
+      if (histAnt[0] && !histAnt[0].over25 && pCorr > 0.55) corrBoost = Math.round(pCorr * 12)
     }
 
-    // === METRICA 5: Analise por faixa horaria ===
-    // Dividir historico em 3 faixas: recente (0-8), medio (8-24), antigo (24-48)
-    const faixaRecente = histCompleto.slice(0, 8).filter(Boolean) as PlacarInfo[]
-    const faixaMedio = histCompleto.slice(8, 24).filter(Boolean) as PlacarInfo[]
-    const pctRecente = faixaRecente.length > 0 ? Math.round(faixaRecente.filter(p => p.over25).length / faixaRecente.length * 100) : pO25
-    const pctMedio = faixaMedio.length > 0 ? Math.round(faixaMedio.filter(p => p.over25).length / faixaMedio.length * 100) : pO25
-    // Tendencia: se recente < medio = over esta "devendo"
-    const tendFaixas = pctMedio - pctRecente // positivo = over devendo
-
-    // === SCORE COMPOSTO (Metrica 6) ===
-    const placares = linhasComp.map(l => extrairPlacar(l[col] as string))
-    const atual = placares[0]
-    if (!atual) return
-
+    // Score final
     let boost = 0
-    let motivo = ''
+    const motivos: string[] = []
 
-    // Boost por padrao de linhas (peso decrescente)
-    const desvio = pctPonderado - pO25
-    if (desvio < -15) boost += 18
-    else if (desvio < -8) boost += 10
-    else if (desvio > 15) boost -= 15
-    else if (desvio > 8) boost -= 8
+    // A: desvio ponderado
+    if (desvPond < -20) { boost += 20; motivos.push('Over devendo++') }
+    else if (desvPond < -10) { boost += 12; motivos.push('Over devendo') }
+    else if (desvPond > 20) { boost -= 18; motivos.push('Over excesso') }
+    else if (desvPond > 10) { boost -= 10 }
 
-    // Boost por ciclo
+    // B: ciclo
     if (cicloMedio > 0 && seqAtual >= cicloMedio) {
-      const fatorCiclo = Math.min((seqAtual - cicloMedio + 1) * 8, 22)
-      boost += dirAtual ? -fatorCiclo : fatorCiclo
-      motivo = 'Ciclo:' + cicloMedio + ' Seq:' + seqAtual
+      const fc = Math.min((seqAtual - cicloMedio + 1) * 9, 24)
+      boost += dirAtual ? -fc : fc
+      motivos.push('Ciclo ' + cicloMedio + ' seq ' + seqAtual)
     }
 
-    // Boost por faixas horarias
-    if (tendFaixas > 15) boost += 12
-    else if (tendFaixas > 8) boost += 6
-    else if (tendFaixas < -15) boost -= 10
+    // C: tendencia temporal
+    if (tendencia > 20) { boost += 14; motivos.push('Tend+') }
+    else if (tendencia > 10) { boost += 7 }
+    else if (tendencia < -20) { boost -= 12 }
+    else if (tendencia < -10) { boost -= 6 }
 
-    // Boost por correlacao com coluna anterior
+    // D: correlacao
     boost += corrBoost
+    if (corrBoost > 0) motivos.push('Corr+')
 
-    // Boost por tipo IA (padrao de linhas recentes)
+    // E: padrao de linhas por tipo
     if (tipoIA === 1) {
       const ant = placares[1]
       if (ant) {
-        if (atual.over25 === ant.over25) { boost += atual.over25 ? -8 : 10; motivo += '|2igual' }
-        else { boost += atual.over25 ? 5 : -5; motivo += '|alternando' }
+        if (atual.over25 === ant.over25) { boost += atual.over25 ? -10 : 12; motivos.push(atual.over25 ? '2xG->rev' : '2xR->corr') }
+        else { boost += atual.over25 ? 4 : -4 }
       }
     } else if (tipoIA === 2) {
       const ant1 = placares[1], ant2 = placares[2]
       if (ant1 && ant2) {
         const reds = [ant2.over25, ant1.over25, atual.over25].filter(r => !r).length
-        const greens = 3 - reds
-        if (reds === 3) { boost += 18; motivo += '|3xRED' }
-        else if (greens === 3) { boost -= 16; motivo += '|3xGREEN' }
-        else if (ant1.over25 === atual.over25) { boost += atual.over25 ? -7 : 9; motivo += '|2igual' }
+        if (reds === 3) { boost += 20; motivos.push('3xRED') }
+        else if (reds === 0) { boost -= 18; motivos.push('3xGREEN') }
+        else if (ant1.over25 === atual.over25) { boost += atual.over25 ? -8 : 10 }
       }
     } else {
       const ant1 = placares[1], ant2 = placares[2], ant3 = placares[3]
       if (ant1 && ant2 && ant3) {
         const reds = [ant3.over25, ant2.over25, ant1.over25, atual.over25].filter(r => !r).length
-        const greens = 4 - reds
-        if (reds === 4) { boost += 22; motivo += '|4xRED' }
-        else if (greens === 4) { boost -= 18; motivo += '|4xGREEN' }
-        else if (reds === 3) { boost += 14; motivo += '|3/4RED' }
-        else if (greens === 3) { boost -= 12; motivo += '|3/4GREEN' }
+        if (reds === 4) { boost += 25; motivos.push('4xRED') }
+        else if (reds === 0) { boost -= 22; motivos.push('4xGREEN') }
+        else if (reds === 3) { boost += 16; motivos.push('3/4R') }
+        else if (reds === 1) { boost -= 14; motivos.push('3/4G') }
+        const mgRec = placares.filter(Boolean).reduce((s, p) => s + p!.gols, 0) / Math.max(placares.filter(Boolean).length, 1)
+        if (mgRec > mediaG + 0.8) boost -= 8
+        if (mgRec < mediaG - 0.8) boost += 8
       }
     }
 
-    // Ajuste por media de gols
-    if (mediaG > 3.0) boost -= 5
-    if (mediaG < 1.5) boost += 5
+    if (mediaG > 3.2) boost -= 6
+    if (mediaG < 1.3) boost += 6
+    boost = Math.max(-32, Math.min(32, boost))
 
-    // Limitar boost total
-    boost = Math.max(-30, Math.min(30, boost))
-
-    const baseO25 = Math.min(Math.max(pO25 + boost, 10), 93)
-    let mercado = '', prob = 0, conf = 55
+    const motivo = motivos.length > 0 ? motivos.join(' | ') : 'Base:' + pO25 + '%'
+    const baseO25 = Math.min(Math.max(pO25 + boost, 8), 94)
+    let mercado = '', prob = 0, conf = 50
 
     if (temFiltro) {
       const greens = validos.filter(p => passaFiltro(p, filtroAtivo)).length
-      const pct = Math.round(greens / n * 100)
+      const pctFiltro = Math.round(greens / n * 100)
       const partes: string[] = []
       if (filtroAtivo.over) partes.push('OVER ' + filtroAtivo.over)
       if (filtroAtivo.under) partes.push('UNDER ' + filtroAtivo.under)
@@ -214,55 +215,42 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       if (filtroAtivo.ambas === 'nao') partes.push('AMBAS NAO')
       if (filtroAtivo.resultado) partes.push(filtroAtivo.resultado.toUpperCase())
       mercado = partes.join(' + ')
-      // Prob = % historica pura + boost moderado max +10
-      prob = Math.min(Math.max(pct + Math.min(Math.max(boost, -10), 10), 10), 93)
-      // Confianca baseada na consistencia historica real
-      const dev = Math.abs(pct - 50)
-      conf = n >= 30 && dev > 25 ? 80
-           : n >= 20 && dev > 20 ? 70
-           : n >= 10 && dev > 15 ? 62
-           : 50
+      prob = Math.min(Math.max(pctFiltro + Math.min(Math.max(boost, -12), 12), 8), 94)
+      const dev = Math.abs(pctFiltro - 50)
+      conf = Math.round((n >= 30 && dev > 25 ? 80 : n >= 20 && dev > 20 ? 70 : n >= 10 && dev > 15 ? 62 : 50) * estabilidade)
     } else {
-      // Escolher UM mercado claro - com vantagem minima de 15% sobre o oposto
-      // Over vs Under: escolhe o que tiver maior vantagem historica
-      const overProb = baseO25
-      const underProb = 100 - baseO25
-
-      // So considera over se vantagem clara (>15% acima de 50)
-      // So considera under se vantagem clara (>15% acima de 50)
       const opcoes: { nome: string; prob: number; vantagem: number }[] = []
-
-      if (overProb > underProb && overProb > 55) {
-        opcoes.push({ nome: 'OVER 2.5', prob: overProb, vantagem: overProb - 50 })
-      } else if (underProb > overProb && underProb > 55) {
-        opcoes.push({ nome: 'UNDER 2.5', prob: underProb, vantagem: underProb - 50 })
-      }
-
-      if (pO15 > 70) opcoes.push({ nome: 'OVER 1.5', prob: pO15, vantagem: pO15 - 50 })
-      if (pO35 > 55) opcoes.push({ nome: 'OVER 3.5', prob: Math.min(pO35 + (mediaG > 3 ? 8 : 0), 88), vantagem: pO35 - 50 })
-      if (pAmbas > 60) opcoes.push({ nome: 'AMBAS SIM', prob: Math.min(pAmbas + (boost > 10 ? 8 : 0), 92), vantagem: pAmbas - 50 })
-      if (pCasa > 60) opcoes.push({ nome: 'CASA', prob: pCasa, vantagem: pCasa - 50 })
-      if (pFora > 55) opcoes.push({ nome: 'FORA', prob: pFora, vantagem: pFora - 50 })
+      if (baseO25 > 100 - baseO25 && baseO25 > 56) opcoes.push({ nome: 'OVER 2.5', prob: baseO25, vantagem: baseO25 - 50 })
+      else if (100 - baseO25 > baseO25 && 100 - baseO25 > 56) opcoes.push({ nome: 'UNDER 2.5', prob: 100 - baseO25, vantagem: 100 - baseO25 - 50 })
+      if (pO15 > 72) opcoes.push({ nome: 'OVER 1.5', prob: pO15, vantagem: pO15 - 50 })
+      if (pO35 > 56) opcoes.push({ nome: 'OVER 3.5', prob: Math.min(pO35 + (mediaG > 3 ? 8 : 0), 88), vantagem: pO35 - 50 })
+      if (pAmbas > 62) opcoes.push({ nome: 'AMBAS SIM', prob: Math.min(pAmbas + (boost > 8 ? 6 : 0), 92), vantagem: pAmbas - 50 })
+      if (pCasa > 62) opcoes.push({ nome: 'CASA', prob: pCasa, vantagem: pCasa - 50 })
+      if (pFora > 58) opcoes.push({ nome: 'FORA', prob: pFora, vantagem: pFora - 50 })
 
       if (opcoes.length === 0) {
-        // Sem padrao claro - nao exibir nas melhores entradas
-        mercado = overProb >= underProb ? 'OVER 2.5' : 'UNDER 2.5'
-        prob = Math.max(overProb, underProb)
-        conf = 40 // baixa confianca - nao vai aparecer nas melhores entradas
+        mercado = baseO25 >= 50 ? 'OVER 2.5' : 'UNDER 2.5'
+        prob = Math.max(baseO25, 100 - baseO25)
+        conf = Math.round(40 * estabilidade)
       } else {
         opcoes.sort((a, b) => b.vantagem - a.vantagem)
         mercado = opcoes[0].nome
         prob = Math.round(opcoes[0].prob)
-        conf = Math.abs(boost) > 20 ? 90 : Math.abs(boost) > 14 ? 80 : Math.abs(boost) > 8 ? 70 : opcoes[0].vantagem > 25 ? 72 : opcoes[0].vantagem > 15 ? 62 : 50
+        const vant = opcoes[0].vantagem
+        conf = Math.round((
+          Math.abs(boost) > 22 ? 88 :
+          Math.abs(boost) > 14 ? 78 :
+          Math.abs(boost) > 8 ? 68 :
+          vant > 25 ? 72 : vant > 15 ? 62 : 52
+        ) * estabilidade)
       }
     }
 
-    if (!motivo) motivo = 'Hist:' + pO25 + '% Pond:' + pctPonderado + '% Tend:' + (tendFaixas > 0 ? '+' : '') + tendFaixas + '%'
-
-    resultado.push({ minuto: min, mercado, probabilidade: Math.round(prob), confianca: conf, motivo })
+    resultado.push({ minuto: min, mercado, probabilidade: Math.round(prob), confianca: Math.min(conf, 93), motivo })
   })
   return resultado
 }
+
 
 export default function GradeResultados({ linhas, colunas, horas, liga, ligas, onTrocarLiga, dadosTodasLigas }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
