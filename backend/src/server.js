@@ -4,6 +4,8 @@ const axios = require('axios');
 const { db } = require('./firebase');
 
 const app = express();
+
+// Configurações iniciais
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
@@ -11,80 +13,122 @@ const SLUGS_LIGA = {
   'Copa do Mundo': 'copa',
   'Euro Cup': 'euro',
   'Premier League': 'premier',
-  'Super Liga Sul-Americana': 'super', // Ajustado para bater com seu background.js
+  'Super Liga Sul-Americana': 'super',
   'Express Cup': 'express',
 };
 
+// Rota de Teste
 app.get('/', (req, res) => {
-  res.json({ status: 'BetGol API rodando!' });
+  res.json({ status: 'BetGol API rodando!', timestamp: new Date().toISOString() });
 });
 
-// 1. ROTA NOVA: Busca os dados que VOCÊ capturou (Sem depender de terceiros)
+/**
+ * 1. ROTA DE RESULTADOS LOCAIS (FIREBASE)
+ * Busca os dados capturados pela sua extensão.
+ * Adicionado Plano B caso o Firebase exija índice composto.
+ */
 app.get('/resultados-locais', async (req, res) => {
   try {
-    const liga = req.query.liga;
+    const { liga } = req.query;
     let query = db.collection('partidas');
 
-    // Se o frontend pedir uma liga específica, filtramos
     if (liga) {
       query = query.where('liga', '==', liga);
     }
 
-    // Pegamos as últimas 100 partidas capturadas, ordenadas pelo tempo
-    const snapshot = await query.orderBy('timestamp', 'desc').limit(100).get();
-    
-    const partidas = [];
-    snapshot.forEach(doc => {
-      partidas.push(doc.data());
-    });
+    try {
+      // Tenta buscar ordenado (Requer índice no Firebase)
+      const snapshot = await query.orderBy('timestamp', 'desc').limit(100).get();
+      const partidas = [];
+      snapshot.forEach(doc => partidas.push(doc.data()));
+      return res.json(partidas);
+      
+    } catch (indexError) {
+      console.warn('Aviso: Índice não encontrado ou erro no orderBy. Usando ordenação manual.');
+      
+      // PLANO B: Busca sem orderBy para evitar Erro 500
+      const snapshotSimples = await query.limit(100).get();
+      const partidas = [];
+      snapshotSimples.forEach(doc => {
+        partidas.push(doc.data());
+      });
 
-    res.json(partidas);
+      // Ordena via JavaScript (descendente por timestamp)
+      partidas.sort((a, b) => {
+        const timeA = a.timestamp || 0;
+        const timeB = b.timestamp || 0;
+        return timeB - timeA;
+      });
+
+      return res.json(partidas);
+    }
   } catch (e) {
-    console.error('Erro ao buscar do Firebase:', e);
-    res.status(500).json({ error: 'Erro ao buscar dados locais' });
+    console.error('Erro crítico no /resultados-locais:', e);
+    res.status(500).json({ error: 'Erro ao buscar dados locais', details: e.message });
   }
 });
 
-// 2. ROTA ANTIGA: Proxy para AnaliseTips (Pode manter por enquanto como backup)
+/**
+ * 2. ROTA DE CAPTURA (RECEBE DA EXTENSÃO)
+ * Salva ou atualiza os dados no Firestore.
+ */
+app.post('/capturar', async (req, res) => {
+  try {
+    const partida = req.body;
+
+    // Validação básica
+    if (!partida || !partida.liga) {
+      return res.status(400).json({ erro: 'Dados da partida incompletos' });
+    }
+
+    // Garante que existe um timestamp para ordenação
+    partida.timestamp = partida.timestamp || Date.now();
+    
+    // Cria uma ID única: "Liga-IDEvento" ou "Liga-Timestamp"
+    const idEvento = partida.id_evento || `manual-${Date.now()}`;
+    const docId = `${partida.liga}-${idEvento}`.replace(/\s+/g, '_'); // Substitui espaços por _
+
+    await db.collection('partidas').doc(docId).set(partida, { merge: true });
+
+    console.log(`[OK] Capturado: ${partida.liga} | ${partida.time_casa} vs ${partida.time_fora}`);
+    res.json({ sucesso: true, id: docId });
+
+  } catch (e) {
+    console.error('Erro ao salvar no Firebase:', e);
+    res.status(500).json({ erro: 'Erro interno ao salvar', detalhes: e.message });
+  }
+});
+
+/**
+ * 3. ROTA PROXY ANALISETIPS (BACKUP)
+ */
 app.get('/resultados', async (req, res) => {
   try {
     const liga = req.query.liga || 'Copa do Mundo';
     const slug = SLUGS_LIGA[liga] || 'copa';
     const token = process.env.ANALISETIPS_TOKEN;
 
-    if (!token) return res.status(500).json({ error: 'Token não configurado' });
+    if (!token) {
+      return res.status(500).json({ error: 'Token AnaliseTips não configurado nas variáveis de ambiente' });
+    }
 
     const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${slug}&page=1&rows=720&method=resultsBoth`;
     const resp = await axios.get(url, {
       headers: { 'Authorization': `Bearer ${token}` },
-      timeout: 15000,
+      timeout: 10000,
     });
+    
     res.json(resp.data);
   } catch (e) {
-    res.status(500).json({ error: 'Erro AnaliseTips' });
+    console.error('Erro Proxy AnaliseTips:', e.message);
+    res.status(500).json({ error: 'Falha na comunicação com AnaliseTips' });
   }
 });
 
-// 3. ROTA DE CAPTURA: Recebe dados da extensão Chrome (Já está funcionando!)
-app.post('/capturar', async (req, res) => {
-  try {
-    const partida = req.body;
-    if (!partida || !partida.liga || !partida.id_evento) {
-      return res.status(400).json({ erro: 'Dados inválidos' });
-    }
-    
-    // Salva no Firestore usando uma ID única baseada na liga e ID do evento
-    await db.collection('partidas').doc(`${partida.liga}-${partida.id_evento}`).set(partida, { merge: true });
-    
-    console.log(`Partida salva: ${partida.time_casa} vs ${partida.time_fora} - ${partida.liga}`);
-    res.json({ sucesso: true });
-  } catch (e) {
-    console.error('Erro ao salvar partida:', e);
-    res.status(500).json({ erro: 'Erro interno' });
-  }
-});
-
+// Inicialização do Servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`BetGol backend rodando na porta ${PORT}`);
+  console.log('-----------------------------------------');
+  console.log(` BETGOL BACKEND RODANDO NA PORTA ${PORT} `);
+  console.log('-----------------------------------------');
 });
