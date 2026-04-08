@@ -1,43 +1,22 @@
 {
   "manifest_version": 3,
   "name": "BetGol Capturador",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Captura dados do futebol virtual da Bet365 para o BetGol",
   "permissions": [
-    "activeTab",
     "storage",
     "scripting",
     "tabs"
   ],
   "host_permissions": [
-    "https://www.bet365.bet.br/*",
-    "https://www.bet365.com/*",
+    "https://*.bet365.bet.br/*",
+    "https://*.bet365.com/*",
     "https://betgol-production.up.railway.app/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://www.bet365.bet.br/*",
-        "https://www.bet365.com/*"
-      ],
-      "js": ["content.js"],
-      "run_at": "document_start",
-      "world": "MAIN"
-    }
-  ],
   "action": {
     "default_popup": "popup.html"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["content.js"],
-      "matches": [
-        "https://www.bet365.bet.br/*",
-        "https://www.bet365.com/*"
-      ]
-    }
-  ]
+  }
 }
