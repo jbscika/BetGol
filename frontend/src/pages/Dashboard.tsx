@@ -46,9 +46,9 @@ function Dashboard() {
       await Promise.all(Object.keys(LIGAS).map(async (liga) => {
         if (liga === ligaSelecionada) return
         try {
-          const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(liga)}`)
+          const resp = await fetch(`${API}/resultados-locais?liga=${encodeURIComponent(liga)}`)
           const json = await resp.json()
-          if (json.data?.linhas) resultados[liga] = json.data.linhas
+          if (Array.isArray(json) && json.length > 0) resultados[liga] = json
         } catch {}
       }))
       setDadosTodasLigas(resultados)
@@ -58,18 +58,17 @@ function Dashboard() {
   async function buscarDadosSilencioso() {
     try {
       const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
-      const url = `${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`
+      const url = `${API}/resultados-locais?liga=${encodeURIComponent(ligaSelecionada)}`
       const resp = await fetch(url)
-      const json = await resp.json()
-      if (!json.data) return
-      const dados = json.data
-      const linhasData = dados.linhas || dados.resultados || dados.rows || []
-      const colunasData = dados.colunas || ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
-      const horasData = dados.horas || []
-      setLinhas(linhasData)
+      const partidas = await resp.json()
+      
+      if (!Array.isArray(partidas)) return
+      
+      const colunasData = ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+      
+      setLinhas(partidas)
       setColunas(colunasData)
-      setHoras(horasData)
-      setTotalPartidas(linhasData.length)
+      setTotalPartidas(partidas.length)
     } catch (e) {
       console.error('Erro na atualização silenciosa:', e)
     }
@@ -80,18 +79,17 @@ function Dashboard() {
       setCarregando(true)
       setErro(null)
       const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
-      const url = `${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`
+      const url = `${API}/resultados-locais?liga=${encodeURIComponent(ligaSelecionada)}`
       const resp = await fetch(url)
-      const json = await resp.json()
-      if (!json.data) throw new Error('Dados inválidos')
-      const dados = json.data
-      const linhasData = dados.linhas || dados.resultados || dados.rows || []
-      const colunasData = dados.colunas || ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
-      const horasData = dados.horas || []
-      setLinhas(linhasData)
+      const partidas = await resp.json()
+      
+      if (!Array.isArray(partidas)) throw new Error('Dados inválidos')
+      
+      const colunasData = ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+      
+      setLinhas(partidas)
       setColunas(colunasData)
-      setHoras(horasData)
-      setTotalPartidas(linhasData.length)
+      setTotalPartidas(partidas.length)
     } catch (e: any) {
       setErro('Erro ao carregar dados. Tente novamente.')
       console.error(e)
