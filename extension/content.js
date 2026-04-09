@@ -1,7 +1,6 @@
 // BetGol Capturador - intercepta ANTES da pagina carregar
 if (!window._betgolAtivo) {
   window._betgolAtivo = true;
-
   console.log('BetGol: Interceptador de rede ativado no site!');
 
   // 1. Intercepta FETCH
@@ -9,14 +8,15 @@ if (!window._betgolAtivo) {
   window.fetch = async function(input, init) {
     const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : String(input));
     const resposta = await originalFetch.apply(this, arguments);
-
     if (url && url.includes('virtualsportscontentapi/coupon')) {
       try {
         const clone = resposta.clone();
         const texto = await clone.text();
         console.log('BetGol: Fetch capturado!');
-        
-        // ENVIA VIA POSTMESSAGE (PONTE)
+
+        // LOG TEMPORÁRIO - mostra os primeiros 2000 caracteres do texto bruto
+        console.log('BetGol DEBUG texto bruto (primeiros 2000 chars):', texto.substring(0, 2000));
+
         window.postMessage({
           tipo: 'BETGOL_DADOS_BRUTO',
           dados: { url, resposta: texto, timestamp: new Date().toISOString() }
@@ -41,8 +41,10 @@ if (!window._betgolAtivo) {
     this.addEventListener('load', function() {
       if (this._betgolUrl && this._betgolUrl.includes('virtualsportscontentapi/coupon')) {
         console.log('BetGol: XHR capturado!');
-        
-        // ENVIA VIA POSTMESSAGE (PONTE)
+
+        // LOG TEMPORÁRIO - mostra os primeiros 2000 caracteres do texto bruto
+        console.log('BetGol DEBUG texto bruto (primeiros 2000 chars):', this.responseText.substring(0, 2000));
+
         window.postMessage({
           tipo: 'BETGOL_DADOS_BRUTO',
           dados: { url: this._betgolUrl, resposta: this.responseText, timestamp: new Date().toISOString() }
