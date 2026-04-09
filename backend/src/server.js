@@ -7,60 +7,29 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/', (req, res) => {
-  res.json({ status: 'BetGol API Online', versao: '3.0 - Grade Corrigida' });
+  res.json({ status: 'BetGol API Online', versao: '4.0 - Grade por Hora' });
 });
 
 // =========================================================================
-// FUNÇÃO: Descobre em qual linha (ciclo) um minuto pertence
-// Regra: o último dígito do minuto inicial define o offset do ciclo
-// Ex: offset 8 → linha começa em 01, 04, 07... 58
-//     offset 9 → linha começa em 02, 05, 08... 59
-// =========================================================================
-function descobrirLinha(minuto) {
-  const min = parseInt(minuto);
-  // O offset é o resto de (minuto - 1) % 3, ajustado para achar o início do ciclo
-  // Ciclo A: 01,04,07,10,13,16,19,22,25,28,31,34,37,40,43,46,49,52,55,58 (offset: min%3 === 1)
-  // Ciclo B: 02,05,08,11,14,17,20,23,26,29,32,35,38,41,44,47,50,53,56,59 (offset: min%3 === 2)
-  // Ciclo C: 00,03,06,09,12,15,18,21,24,27,30,33,36,39,42,45,48,51,54,57 (offset: min%3 === 0)
-  return min % 3;
-}
-
-// =========================================================================
-// FUNÇÃO: Acha o slot tempoXX mais próximo (abaixo ou igual) ao minuto
-// dentro do ciclo correto
+// FUNÇÃO: Descobre o slot tempoXX correto para um minuto
+// Ciclos de 3 em 3 minutos: 01,04,07...58 ou 02,05,08...59 ou 00,03,06...57
 // =========================================================================
 function descobrirSlot(minuto) {
   const min = parseInt(minuto);
-  const offset = min % 3;
-
-  // Gera todos os slots do ciclo até 59
-  const slots = [];
-  for (let s = offset === 0 ? 0 : offset; s <= 59; s += 3) {
-    slots.push(s);
-  }
-
-  // Pega o slot exato ou o mais próximo abaixo
-  let slotEscolhido = slots[0];
-  for (const s of slots) {
-    if (s <= min) slotEscolhido = s;
-    else break;
-  }
-
-  return String(slotEscolhido).padStart(2, '0');
+  return String(min).padStart(2, '0');
 }
 
 // =========================================================================
-// FUNÇÃO: Transforma os dados da extensão no formato que o Dashboard lê
+// FUNÇÃO: Transforma os dados da extensão no formato correto
 // =========================================================================
 function transformarDados(dados) {
-  // Extrai hora e minuto do data_evento (formato: YYYYMMDDHHmmss)
   let hora = null;
   let minuto = null;
   let horario = null;
 
   if (dados.data_evento && dados.data_evento.length >= 12) {
-    hora = dados.data_evento.substring(8, 10);   // posição 8-9 = hora
-    minuto = dados.data_evento.substring(10, 12); // posição 10-11 = minuto
+    hora = dados.data_evento.substring(8, 10);
+    minuto = dados.data_evento.substring(10, 12);
     horario = `${hora}:${minuto}`;
   } else if (dados.horario) {
     const partes = dados.horario.split(':');
@@ -69,32 +38,28 @@ function transformarDados(dados) {
     horario = dados.horario;
   }
 
-  // Se não tem hora/minuto, não consegue transformar
   if (!hora || !minuto) return dados;
 
-  // Descobre o slot tempoXX correto para esse minuto
   const slot = descobrirSlot(minuto);
   const chaveSlot = `tempo${slot}`;
 
-  // Monta o placar no formato "casa-fora" se tiver nos placares capturados
-  // Usa o placar de maior probabilidade (primeiro da lista) como referência
   let placarStr = null;
   if (dados.placares && dados.placares.length > 0) {
-    placarStr = dados.placares[0].placar; // ex: "2-1"
+    placarStr = dados.placares[0].placar;
   }
 
-  // Retorna os dados enriquecidos com os campos que o Dashboard espera
   return {
     ...dados,
     hora,
     minuto,
     horario,
-    [chaveSlot]: placarStr, // ex: tempo28: "2-1"
+    [chaveSlot]: placarStr,
   };
 }
 
 // =========================================================================
-// ROTA: Resultados Locais — busca jogos do Firebase
+// ROTA: Resultados Locais
+// Agrupa jogos por hora, formando linhas para a grade do dashboard
 // =========================================================================
 app.get('/resultados-locais', async (req, res) => {
   try {
@@ -108,23 +73,61 @@ app.get('/resultados-locais', async (req, res) => {
     const snapshot = await query.limit(700).get();
 
     if (snapshot.empty) {
-      console.log('Firebase vazio para a liga:', ligaPedida);
       return res.json([]);
     }
 
-    const partidas = [];
+    // Coleta todos os jogos individuais
+    const jogos = [];
     snapshot.forEach(doc => {
-      partidas.push(doc.data());
+      jogos.push(doc.data());
     });
 
-    // Ordena do mais recente para o mais antigo
-    partidas.sort((a, b) => {
-      const dataA = a.data_evento || '';
-      const dataB = b.data_evento || '';
-      return dataB.localeCompare(dataA);
+    // =========================================================================
+    // AGRUPA por hora — cada hora vira uma "linha" da grade
+    // Cada linha tem os campos tempoXX preenchidos com o placar do jogo
+    // =========================================================================
+    const linhasPorHora = {};
+
+    jogos.forEach(jogo => {
+      const hora = jogo.hora || (jogo.horario ? jogo.horario.split(':')[0] : null);
+      const minuto = jogo.minuto || (jogo.horario ? jogo.horario.split(':')[1] : null);
+
+      if (!hora || !minuto) return;
+
+      const chave = `${jogo.liga || ''}-${hora}`;
+
+      if (!linhasPorHora[chave]) {
+        linhasPorHora[chave] = {
+          hora,
+          liga: jogo.liga,
+          data_evento_base: jogo.data_evento ? jogo.data_evento.substring(0, 8) : null,
+        };
+      }
+
+      // Preenche o slot tempoXX com o placar
+      const slot = `tempo${String(parseInt(minuto)).padStart(2, '0')}`;
+
+      // Só preenche se ainda não tem (evita sobrescrever com jogo mais antigo)
+      if (!linhasPorHora[chave][slot]) {
+        linhasPorHora[chave][slot] = jogo[slot] || null;
+
+        // Se não tem o slot no jogo, tenta extrair do placar
+        if (!linhasPorHora[chave][slot] && jogo.placares && jogo.placares.length > 0) {
+          linhasPorHora[chave][slot] = jogo.placares[0].placar;
+        }
+      }
     });
 
-    res.json(partidas);
+    // Converte o objeto em array e ordena do mais recente para o mais antigo
+    const linhas = Object.values(linhasPorHora);
+
+    linhas.sort((a, b) => {
+      const dA = (a.data_evento_base || '') + (a.hora || '');
+      const dB = (b.data_evento_base || '') + (b.hora || '');
+      return dB.localeCompare(dA);
+    });
+
+    res.json(linhas);
   } catch (erro) {
     console.error('Erro ao buscar dados no Firebase:', erro);
     res.status(500).json({ erro: 'Erro interno no servidor' });
@@ -142,15 +145,13 @@ app.post('/capturar', async (req, res) => {
       return res.status(400).json({ erro: 'Dados incompletos' });
     }
 
-    // Transforma os dados para o formato correto antes de salvar
     const dados = transformarDados(dadosBrutos);
-
     dados.timestamp = Date.now();
 
     const docId = `${dados.liga}-${dados.id_evento}`;
     await db.collection('partidas').doc(docId).set(dados, { merge: true });
 
-    console.log(`[SUCESSO] Jogo salvo: ${dados.liga} às ${dados.horario || '---'} → slot: ${dados.minuto ? 'tempo' + descobrirSlot(dados.minuto) : '???'}`);
+    console.log(`[SUCESSO] Jogo salvo: ${dados.liga} às ${dados.horario || '---'}`);
     res.json({ sucesso: true });
   } catch (erro) {
     console.error('Erro ao capturar:', erro);
