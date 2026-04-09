@@ -21,10 +21,7 @@ function parsearPartida(texto, liga) {
     if (!eventoMatch) return null;
     const idEvento = eventoMatch[1];
 
-    // =========================================================================
-    // CORREÇÃO: Extrai data_evento no formato YYYYMMDDHHmmss
-    // O campo ficava null antes porque o regex não cobria todos os formatos
-    // =========================================================================
+    // Extrai data_evento no formato YYYYMMDDHHmmss
     let dataEvento = null;
     const dataMatch1 = texto.match(/CM=.*?~(\d{14})/);
     const dataMatch2 = texto.match(/ST=(\d{14})/);
@@ -34,7 +31,6 @@ function parsearPartida(texto, liga) {
     else if (dataMatch2) dataEvento = dataMatch2[1];
     else if (dataMatch3) dataEvento = dataMatch3[1];
 
-    // Se ainda não achou, tenta qualquer sequência de 14 dígitos no texto
     if (!dataEvento) {
       const dataMatchFallback = texto.match(/(\d{14})/);
       if (dataMatchFallback) dataEvento = dataMatchFallback[1];
@@ -84,7 +80,7 @@ function parsearPartida(texto, liga) {
     return {
       liga,
       id_evento: idEvento,
-      data_evento: dataEvento,   // ← agora vem preenchido corretamente
+      data_evento: dataEvento,
       timestamp: new Date().toISOString(),
       time_casa: timeCasa || 'Casa',
       time_fora: timeFora || 'Fora',
@@ -131,45 +127,81 @@ async function enviarParaBackend(texto, url, liga) {
 }
 
 // =========================================================================
-// SISTEMA DE INJEÇÃO E PONTE DE COMUNICAÇÃO (CORRIGE OS ERROS)
+// FUNÇÃO CENTRAL DE INJEÇÃO — usada por todos os listeners abaixo
 // =========================================================================
+function injetarNaAba(tabId) {
+  // 1. Injeta o Capturador no mundo da página (Para ler requisições XHR/Fetch)
+  chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['content.js'],
+    world: 'MAIN',
+  }).catch(e => console.log('BetGol: Erro silencioso ao injetar MAIN', e));
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    if (tab.url.includes('bet365.com') || tab.url.includes('bet365.bet.br')) {
+  // 2. Injeta a PONTE no mundo da Extensão (Para acessar o Chrome Runtime)
+  chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'ISOLATED',
+    func: () => {
+      if (window._betgolPonteAtiva) return;
+      window._betgolPonteAtiva = true;
 
-      // 1. Injeta o Capturador no mundo da página (Para ler requisições XHR)
-      chrome.scripting.executeScript({
-        target: { tabId },
-        files: ['content.js'],
-        world: 'MAIN',
-      }).catch(e => console.log('BetGol: Erro silencioso ao injetar MAIN', e));
-
-      // 2. Injeta a PONTE no mundo da Extensão (Para acessar o Chrome Runtime)
-      chrome.scripting.executeScript({
-        target: { tabId },
-        world: 'ISOLATED',
-        func: () => {
-          if (window._betgolPonteAtiva) return;
-          window._betgolPonteAtiva = true;
-
-          window.addEventListener("message", (event) => {
-            if (event.data && event.data.tipo === 'BETGOL_DADOS_BRUTO') {
-              if (chrome.runtime && chrome.runtime.sendMessage) {
-                chrome.runtime.sendMessage({
-                  tipo: 'BETGOL_DADOS',
-                  dados: event.data.dados
-                }).catch(() => {});
-              }
-            }
-          });
+      window.addEventListener("message", (event) => {
+        if (event.data && event.data.tipo === 'BETGOL_DADOS_BRUTO') {
+          if (chrome.runtime && chrome.runtime.sendMessage) {
+            chrome.runtime.sendMessage({
+              tipo: 'BETGOL_DADOS',
+              dados: event.data.dados
+            }).catch(() => {});
+          }
         }
-      }).catch(e => console.log('BetGol: Erro silencioso ao injetar PONTE', e));
+      });
     }
+  }).catch(e => console.log('BetGol: Erro silencioso ao injetar PONTE', e));
+}
+
+function ehBet365(url) {
+  return url && (url.includes('bet365.com') || url.includes('bet365.bet.br'));
+}
+
+// =========================================================================
+// LISTENER 1 — Carregamento normal de página (primeira abertura da aba)
+// =========================================================================
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url && ehBet365(tab.url)) {
+    console.log('BetGol: Injetando via onUpdated');
+    injetarNaAba(tabId);
   }
 });
 
+// =========================================================================
+// LISTENER 2 — Navegação dentro da SPA (bet365 não recarrega a página)
+// Captura quando o usuário clica em Futebol Virtual dentro do site
+// =========================================================================
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (ehBet365(details.url)) {
+    console.log('BetGol: Injetando via webNavigation (SPA)');
+    injetarNaAba(details.tabId);
+  }
+});
+
+// =========================================================================
+// LISTENER 3 — Fallback: injeta em abas bet365 já abertas quando a
+// extensão é recarregada/instalada
+// =========================================================================
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.tabs.query({ url: ['*://*.bet365.com/*', '*://*.bet365.bet.br/*'] }, (tabs) => {
+    tabs.forEach(tab => {
+      if (tab.id) {
+        console.log('BetGol: Injetando em aba já aberta via onInstalled');
+        injetarNaAba(tab.id);
+      }
+    });
+  });
+});
+
+// =========================================================================
 // Recebe os dados limpos da PONTE e processa
+// =========================================================================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.tipo === 'BETGOL_DADOS') {
     const liga = extrairLiga(message.dados.url);
