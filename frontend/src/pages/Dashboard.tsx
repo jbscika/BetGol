@@ -7,7 +7,7 @@ const LIGAS: Record<string, string> = {
   'Copa do Mundo': 'copa',
   'Euro Cup': 'euro',
   'Premier League': 'premier',
-  'Super Liga': 'super',
+  'Super Liga Sul-Americana': 'super',
 }
 
 export interface Partida {
@@ -30,8 +30,6 @@ function Dashboard() {
 
   useEffect(() => {
     buscarTodasLigas()
-    // Verifica a cada 30 segundos — cada rodada dura 3 min
-    // Assim fica no maximo 30 segundos atrasado
     const intervalo = setInterval(() => {
       buscarDadosSilencioso()
       buscarTodasLigas()
