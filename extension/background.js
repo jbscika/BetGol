@@ -21,8 +21,24 @@ function parsearPartida(texto, liga) {
     if (!eventoMatch) return null;
     const idEvento = eventoMatch[1];
 
-    const dataMatch = texto.match(/CM=.*?~(\d{14})/);
-    const dataEvento = dataMatch ? dataMatch[1] : null;
+    // =========================================================================
+    // CORREÇÃO: Extrai data_evento no formato YYYYMMDDHHmmss
+    // O campo ficava null antes porque o regex não cobria todos os formatos
+    // =========================================================================
+    let dataEvento = null;
+    const dataMatch1 = texto.match(/CM=.*?~(\d{14})/);
+    const dataMatch2 = texto.match(/ST=(\d{14})/);
+    const dataMatch3 = texto.match(/;TU=(\d{14})/);
+
+    if (dataMatch1) dataEvento = dataMatch1[1];
+    else if (dataMatch2) dataEvento = dataMatch2[1];
+    else if (dataMatch3) dataEvento = dataMatch3[1];
+
+    // Se ainda não achou, tenta qualquer sequência de 14 dígitos no texto
+    if (!dataEvento) {
+      const dataMatchFallback = texto.match(/(\d{14})/);
+      if (dataMatchFallback) dataEvento = dataMatchFallback[1];
+    }
 
     const blocoResultado = texto.match(/NA=Resultado Final[\s\S]*?(?=\|MG;)/);
     let timeCasa = null, timeFora = null, oddCasa = null, oddEmpate = null, oddFora = null;
@@ -68,7 +84,7 @@ function parsearPartida(texto, liga) {
     return {
       liga,
       id_evento: idEvento,
-      data_evento: dataEvento,
+      data_evento: dataEvento,   // ← agora vem preenchido corretamente
       timestamp: new Date().toISOString(),
       time_casa: timeCasa || 'Casa',
       time_fora: timeFora || 'Fora',
@@ -92,15 +108,15 @@ async function enviarParaBackend(texto, url, liga) {
   try {
     const partida = parsearPartida(texto, liga);
     if (!partida) return;
-    
-    console.log(`BetGol: Enviando ${partida.time_casa} x ${partida.time_fora} (${liga})`);
-    
+
+    console.log(`BetGol: Enviando ${partida.time_casa} x ${partida.time_fora} (${liga}) | data_evento: ${partida.data_evento}`);
+
     const resp = await fetch(`${BACKEND_URL}/capturar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(partida),
     });
-    
+
     if (resp.ok) {
       chrome.action.setBadgeText({ text: 'OK' });
       chrome.action.setBadgeBackgroundColor({ color: '#00c853' });
@@ -120,9 +136,8 @@ async function enviarParaBackend(texto, url, liga) {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
-    // Só prossegue se for estritamente o site da bet365 (Evita Google)
     if (tab.url.includes('bet365.com') || tab.url.includes('bet365.bet.br')) {
-      
+
       // 1. Injeta o Capturador no mundo da página (Para ler requisições XHR)
       chrome.scripting.executeScript({
         target: { tabId },
@@ -135,19 +150,16 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         target: { tabId },
         world: 'ISOLATED',
         func: () => {
-          // Se a ponte já existe, não duplica
           if (window._betgolPonteAtiva) return;
           window._betgolPonteAtiva = true;
 
-          // Ouve o que o content.js "grita" na página
           window.addEventListener("message", (event) => {
             if (event.data && event.data.tipo === 'BETGOL_DADOS_BRUTO') {
-              // Envia de forma segura para o background.js
               if (chrome.runtime && chrome.runtime.sendMessage) {
-                 chrome.runtime.sendMessage({
-                   tipo: 'BETGOL_DADOS',
-                   dados: event.data.dados
-                 }).catch(() => {}); // Ignora erros de desconexão rápida
+                chrome.runtime.sendMessage({
+                  tipo: 'BETGOL_DADOS',
+                  dados: event.data.dados
+                }).catch(() => {});
               }
             }
           });
@@ -165,7 +177,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       enviarParaBackend(message.dados.resposta, message.dados.url, liga);
     }
   }
-  return true; // Mantém o canal aberto se necessário
+  return true;
 });
 
 console.log('BetGol: Background Server Ativo!');
