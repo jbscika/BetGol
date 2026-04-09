@@ -1,165 +1,186 @@
-const express = require('express');
-const cors = require('cors');
-const { db } = require('./firebase');
-const app = express();
+const axios = require('axios');
 
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+const BET365_COOKIE = process.env.BET365_COOKIE;
 
-app.get('/', (req, res) => {
-  res.json({ status: 'BetGol API Online', versao: '4.0 - Grade por Hora' });
-});
+const LIGAS = {
+  'Express Cup':            'C20940364',
+  'Copa do Mundo':          'C20120650',
+  'Euro Cup':               'C20700663',
+  'Super Liga Sul-Americana': 'C20849528',
+  'Premier League':         'C20120653',
+};
 
 // =========================================================================
-// FUNÇÃO: Descobre o slot tempoXX correto para um minuto
-// Ciclos de 3 em 3 minutos: 01,04,07...58 ou 02,05,08...59 ou 00,03,06...57
+// FUNÇÃO: Busca dados brutos da bet365 para uma liga
 // =========================================================================
-function descobrirSlot(minuto) {
-  const min = parseInt(minuto);
-  return String(min).padStart(2, '0');
+async function buscarResultados(ligaId) {
+  try {
+    const url = `https://www.bet365.bet.br/virtualsportscontentapi/coupon?lid=33&zid=0&pd=%23AC%23B146%23${ligaId}%23D1%23&cid=28&cgid=1&ctid=28`;
+    const response = await axios.get(url, {
+      headers: {
+        'Cookie': BET365_COOKIE,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://www.bet365.bet.br/',
+        'Origin': 'https://www.bet365.bet.br',
+        'Sec-Ch-Ua': '"Chromium";v="146", "Not_A Brand";v="24", "Google Chrome";v="146"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-site',
+        'Connection': 'keep-alive',
+      },
+      timeout: 10000,
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Erro ao buscar liga ${ligaId}: ${error.message}`);
+    return null;
+  }
 }
 
 // =========================================================================
-// FUNÇÃO: Transforma os dados da extensão no formato correto
+// FUNÇÃO: Converte odd fracionária "6/1" para decimal
 // =========================================================================
-function transformarDados(dados) {
-  let hora = null;
-  let minuto = null;
-  let horario = null;
-
-  if (dados.data_evento && dados.data_evento.length >= 12) {
-    hora = dados.data_evento.substring(8, 10);
-    minuto = dados.data_evento.substring(10, 12);
-    horario = `${hora}:${minuto}`;
-  } else if (dados.horario) {
-    const partes = dados.horario.split(':');
-    hora = partes[0];
-    minuto = partes[1];
-    horario = dados.horario;
-  }
-
-  if (!hora || !minuto) return dados;
-
-  const slot = descobrirSlot(minuto);
-  const chaveSlot = `tempo${slot}`;
-
-  let placarStr = null;
-  if (dados.placares && dados.placares.length > 0) {
-    placarStr = dados.placares[0].placar;
-  }
-
-  return {
-    ...dados,
-    hora,
-    minuto,
-    horario,
-    [chaveSlot]: placarStr,
-  };
+function oddParaDecimal(odd) {
+  if (!odd) return 999;
+  const parts = odd.split('/');
+  if (parts.length !== 2) return 999;
+  const num = parseFloat(parts[0]);
+  const den = parseFloat(parts[1]);
+  if (isNaN(num) || isNaN(den) || den === 0) return 999;
+  return (num / den) + 1;
 }
 
 // =========================================================================
-// ROTA: Resultados Locais
-// Agrupa jogos por hora, formando linhas para a grade do dashboard
+// FUNÇÃO: Parseia o texto bruto da bet365 e extrai dados da partida
 // =========================================================================
-app.get('/resultados-locais', async (req, res) => {
+function parsearPartida(texto, liga) {
   try {
-    const ligaPedida = req.query.liga;
-    let query = db.collection('partidas');
+    const eventoMatch = texto.match(/\|EV;ID=E(\d+);/);
+    if (!eventoMatch) return null;
+    const idEvento = eventoMatch[1];
 
-    if (ligaPedida) {
-      query = query.where('liga', '==', ligaPedida);
+    // Extrai data_evento
+    let dataEvento = null;
+    const dataMatch1 = texto.match(/CM=.*?~(\d{14})/);
+    const dataMatch2 = texto.match(/ST=(\d{14})/);
+    const dataMatch3 = texto.match(/;TU=(\d{14})/);
+    if (dataMatch1) dataEvento = dataMatch1[1];
+    else if (dataMatch2) dataEvento = dataMatch2[1];
+    else if (dataMatch3) dataEvento = dataMatch3[1];
+    if (!dataEvento) {
+      const fb = texto.match(/(\d{14})/);
+      if (fb) dataEvento = fb[1];
     }
 
-    const snapshot = await query.limit(700).get();
-
-    if (snapshot.empty) {
-      return res.json([]);
+    // Extrai hora e minuto
+    let hora = null, minuto = null, horario = null;
+    if (dataEvento && dataEvento.length >= 12) {
+      hora = dataEvento.substring(8, 10);
+      minuto = dataEvento.substring(10, 12);
+      horario = `${hora}:${minuto}`;
     }
 
-    // Coleta todos os jogos individuais
-    const jogos = [];
-    snapshot.forEach(doc => {
-      jogos.push(doc.data());
-    });
+    // Extrai times e odds do resultado final
+    const blocoResultado = texto.match(/NA=Resultado Final[\s\S]*?(?=\|MG;)/);
+    let timeCasa = null, timeFora = null, oddCasa = null, oddEmpate = null, oddFora = null;
+    if (blocoResultado) {
+      const paMatches = [...blocoResultado[0].matchAll(/\|PA;ID=\d+;NA=([^;]+);SU=\d;OD=(\d+\/\d+);/g)];
+      if (paMatches[0]) { timeCasa = paMatches[0][1]; oddCasa = paMatches[0][2]; }
+      if (paMatches[1]) { oddEmpate = paMatches[1][2]; }
+      if (paMatches[2]) { timeFora = paMatches[2][1]; oddFora = paMatches[2][2]; }
+    }
+
+    // Extrai ambas marcam
+    let ambasSim = null, ambasNao = null;
+    const blocoAmbas = texto.match(/NA=Para o Time Marcar[\s\S]*?(?=\|MG;)/);
+    if (blocoAmbas) {
+      const simMatch = blocoAmbas[0].match(/NA=Sim;SY=dc;PY=_d;CN=1;\|PA;ID=\d+;OD=(\d+\/\d+)/);
+      const naoMatch = blocoAmbas[0].match(/NA=N[^;]+o;SY=dc;PY=_d;CN=1;\|PA;ID=\d+;OD=(\d+\/\d+)/);
+      if (simMatch) ambasSim = simMatch[1];
+      if (naoMatch) ambasNao = naoMatch[1];
+    }
+
+    // Extrai over/under 2.5
+    let mais25 = null, menos25 = null;
+    const blocoGols = texto.match(/NA=2\.5[\s\S]*?NA=Mais de;SY=dg[\s\S]*?OD=(\d+\/\d+)[\s\S]*?NA=Menos de;SY=dg[\s\S]*?OD=(\d+\/\d+)/);
+    if (blocoGols) { mais25 = blocoGols[1]; menos25 = blocoGols[2]; }
+
+    // Extrai placares possíveis
+    const placares = [];
+    const blocoPlacares = texto.match(/NA=Resultado Correto;[\s\S]*?(?=\|MG;SY=dz;NA=Resultado Correto - Grupo)/);
+    if (blocoPlacares) {
+      const ms = [...blocoPlacares[0].matchAll(/NA=(\d+-\d+);HD=;HA=;OD=(\d+\/\d+);SU=\d;/g)];
+      for (const m of ms) placares.push({ placar: m[1], odd: m[2] });
+    }
 
     // =========================================================================
-    // AGRUPA por hora — cada hora vira uma "linha" da grade
-    // Cada linha tem os campos tempoXX preenchidos com o placar do jogo
+    // DETERMINA O PLACAR MAIS PROVÁVEL (menor odd = mais provável)
     // =========================================================================
-    const linhasPorHora = {};
-
-    jogos.forEach(jogo => {
-      const hora = jogo.hora || (jogo.horario ? jogo.horario.split(':')[0] : null);
-      const minuto = jogo.minuto || (jogo.horario ? jogo.horario.split(':')[1] : null);
-
-      if (!hora || !minuto) return;
-
-      const chave = `${jogo.liga || ''}-${hora}`;
-
-      if (!linhasPorHora[chave]) {
-        linhasPorHora[chave] = {
-          hora,
-          liga: jogo.liga,
-          data_evento_base: jogo.data_evento ? jogo.data_evento.substring(0, 8) : null,
-        };
-      }
-
-      // Preenche o slot tempoXX com o placar
-      const slot = `tempo${String(parseInt(minuto)).padStart(2, '0')}`;
-
-      // Só preenche se ainda não tem (evita sobrescrever com jogo mais antigo)
-      if (!linhasPorHora[chave][slot]) {
-        linhasPorHora[chave][slot] = jogo[slot] || null;
-
-        // Se não tem o slot no jogo, tenta extrair do placar
-        if (!linhasPorHora[chave][slot] && jogo.placares && jogo.placares.length > 0) {
-          linhasPorHora[chave][slot] = jogo.placares[0].placar;
-        }
-      }
-    });
-
-    // Converte o objeto em array e ordena do mais recente para o mais antigo
-    const linhas = Object.values(linhasPorHora);
-
-    linhas.sort((a, b) => {
-      const dA = (a.data_evento_base || '') + (a.hora || '');
-      const dB = (b.data_evento_base || '') + (b.hora || '');
-      return dB.localeCompare(dA);
-    });
-
-    res.json(linhas);
-  } catch (erro) {
-    console.error('Erro ao buscar dados no Firebase:', erro);
-    res.status(500).json({ erro: 'Erro interno no servidor' });
-  }
-});
-
-// =========================================================================
-// ROTA: Capturar — recebe dados da extensão e salva no Firebase
-// =========================================================================
-app.post('/capturar', async (req, res) => {
-  try {
-    const dadosBrutos = req.body;
-
-    if (!dadosBrutos || !dadosBrutos.liga || !dadosBrutos.id_evento) {
-      return res.status(400).json({ erro: 'Dados incompletos' });
+    let placarMaisProvavel = null;
+    if (placares.length > 0) {
+      const ordenados = [...placares].sort((a, b) => oddParaDecimal(a.odd) - oddParaDecimal(b.odd));
+      placarMaisProvavel = ordenados[0].placar;
     }
 
-    const dados = transformarDados(dadosBrutos);
-    dados.timestamp = Date.now();
+    // Slot tempoXX
+    const slot = minuto ? `tempo${String(parseInt(minuto)).padStart(2, '0')}` : null;
 
-    const docId = `${dados.liga}-${dados.id_evento}`;
-    await db.collection('partidas').doc(docId).set(dados, { merge: true });
+    const partida = {
+      liga,
+      id_evento: idEvento,
+      data_evento: dataEvento,
+      timestamp: new Date().toISOString(),
+      hora,
+      minuto,
+      horario,
+      time_casa: timeCasa || 'Casa',
+      time_fora: timeFora || 'Fora',
+      odd_casa: oddCasa,
+      odd_empate: oddEmpate,
+      odd_fora: oddFora,
+      ambas_marcam_sim: ambasSim,
+      ambas_marcam_nao: ambasNao,
+      mais_2_5: mais25,
+      menos_2_5: menos25,
+      placares,
+      placar_previsto: placarMaisProvavel,
+    };
 
-    console.log(`[SUCESSO] Jogo salvo: ${dados.liga} às ${dados.horario || '---'}`);
-    res.json({ sucesso: true });
-  } catch (erro) {
-    console.error('Erro ao capturar:', erro);
-    res.status(500).json({ erro: 'Erro ao salvar partida' });
+    // Adiciona o slot tempoXX com o placar previsto
+    if (slot && placarMaisProvavel) {
+      partida[slot] = placarMaisProvavel;
+    }
+
+    return partida;
+  } catch (e) {
+    console.error('Erro ao parsear partida:', e);
+    return null;
   }
-});
+}
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`SERVIDOR BETGOL RODANDO NA PORTA ${PORT}`);
-});
+// =========================================================================
+// FUNÇÃO: Busca e parseia todas as ligas
+// =========================================================================
+async function buscarTodasLigas() {
+  const resultados = {};
+  for (const nome in LIGAS) {
+    const id = LIGAS[nome];
+    console.log(`Buscando liga: ${nome}...`);
+    const dados = await buscarResultados(id);
+    if (dados) {
+      const partida = parsearPartida(dados, nome);
+      if (partida) {
+        resultados[nome] = partida;
+        console.log(`✓ ${nome}: ${partida.time_casa} x ${partida.time_fora} às ${partida.horario} | Previsto: ${partida.placar_previsto}`);
+      }
+    }
+  }
+  return resultados;
+}
+
+module.exports = { buscarTodasLigas, parsearPartida };
