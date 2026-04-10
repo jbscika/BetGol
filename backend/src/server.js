@@ -1,14 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const { db } = require('./firebase');
-const { buscarTodasLigas } = require('./api');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/', (req, res) => {
-  res.json({ status: 'BetGol API Online', versao: '5.1 - Bot Automático' });
+  res.json({ status: 'BetGol API Online', versao: '6.0 - Resultados Reais' });
 });
 
 // =========================================================================
@@ -57,7 +56,10 @@ app.get('/resultados-locais', async (req, res) => {
       const slot = `tempo${String(parseInt(minuto)).padStart(2, '0')}`;
 
       if (!linhasPorHora[chave][slot]) {
-        linhasPorHora[chave][slot] = jogo[slot] || jogo.placar_previsto ||
+        // Prioridade: placar real > placar previsto > primeiro da lista
+        linhasPorHora[chave][slot] = jogo.placar_real ||
+          jogo[slot] ||
+          jogo.placar_previsto ||
           (jogo.placares && jogo.placares.length > 0 ? jogo.placares[0].placar : null);
       }
     });
@@ -77,7 +79,7 @@ app.get('/resultados-locais', async (req, res) => {
 });
 
 // =========================================================================
-// ROTA: Capturar — recebe dados da extensão
+// ROTA: Capturar — recebe dados do jogo atual da extensão
 // =========================================================================
 app.post('/capturar', async (req, res) => {
   try {
@@ -101,39 +103,42 @@ app.post('/capturar', async (req, res) => {
 });
 
 // =========================================================================
-// BOT AUTOMÁTICO — roda em background sem bloquear o servidor
+// ROTA: Atualizar Resultado — salva o placar REAL do jogo anterior
+// Chamada pelo background.js quando captura SU=1 no texto da bet365
 // =========================================================================
-async function rodarBot() {
-  console.log(`[BOT] Iniciando busca... ${new Date().toISOString()}`);
+app.post('/atualizar-resultado', async (req, res) => {
   try {
-    const resultados = await buscarTodasLigas();
+    const { liga, id_evento, data_evento, hora, minuto, slot, placar_real } = req.body;
 
-    for (const [liga, partida] of Object.entries(resultados)) {
-      if (!partida || !partida.id_evento) continue;
-
-      const docId = `${partida.liga}-${partida.id_evento}`;
-      await db.collection('partidas').doc(docId).set(partida, { merge: true });
-      console.log(`[BOT] Salvo: ${partida.liga} | ${partida.time_casa} x ${partida.time_fora} às ${partida.horario}`);
+    if (!liga || !id_evento || !placar_real) {
+      return res.status(400).json({ erro: 'Dados incompletos' });
     }
 
-    console.log(`[BOT] Ciclo concluído. ${Object.keys(resultados).length} ligas.`);
-  } catch (e) {
-    console.error('[BOT] Erro:', e.message);
-  }
-}
+    const docId = `${liga}-${id_evento}`;
 
-// =========================================================================
-// INICIA O SERVIDOR PRIMEIRO, depois o bot em background
+    // Atualiza o documento com o placar real e o slot correto
+    await db.collection('partidas').doc(docId).set({
+      liga,
+      id_evento,
+      data_evento,
+      hora,
+      minuto,
+      horario: hora && minuto ? `${hora}:${minuto}` : null,
+      placar_real,
+      [slot]: placar_real,
+      timestamp_resultado: Date.now(),
+    }, { merge: true });
+
+    console.log(`[RESULTADO REAL] ${liga} | ${slot} = ${placar_real}`);
+    res.json({ sucesso: true });
+  } catch (erro) {
+    console.error('Erro ao atualizar resultado:', erro);
+    res.status(500).json({ erro: 'Erro ao atualizar resultado' });
+  }
+});
+
 // =========================================================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`SERVIDOR BETGOL RODANDO NA PORTA ${PORT}`);
-
-  // Bot começa 5 segundos após o servidor iniciar
-  setTimeout(() => {
-    rodarBot();
-    setInterval(rodarBot, 3 * 60 * 1000);
-  }, 5000);
-
-  console.log('BOT AUTOMÁTICO SERÁ INICIADO EM 5 SEGUNDOS');
 });
