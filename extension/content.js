@@ -13,9 +13,12 @@ if (!window._betgolAtivo) {
         const clone = resposta.clone();
         const texto = await clone.text();
         console.log('BetGol: Fetch capturado!');
-
-        // LOG TEMPORÁRIO - mostra os primeiros 2000 caracteres do texto bruto
-        console.log('BetGol DEBUG texto bruto (primeiros 2000 chars):', texto.substring(0, 2000));
+        console.log('BetGol DEBUG tamanho total:', texto.length);
+        console.log('BetGol DEBUG INICIO:', texto.substring(0, 1000));
+        console.log('BetGol DEBUG MEIO:', texto.substring(Math.floor(texto.length / 2) - 500, Math.floor(texto.length / 2) + 500));
+        console.log('BetGol DEBUG FIM:', texto.substring(texto.length - 1000));
+        console.log('BetGol DEBUG TEM SU=1:', texto.includes('SU=1'));
+        console.log('BetGol DEBUG TEM SU=2:', texto.includes('SU=2'));
 
         window.postMessage({
           tipo: 'BETGOL_DADOS_BRUTO',
@@ -40,14 +43,18 @@ if (!window._betgolAtivo) {
   XMLHttpRequest.prototype.send = function() {
     this.addEventListener('load', function() {
       if (this._betgolUrl && this._betgolUrl.includes('virtualsportscontentapi/coupon')) {
+        const texto = this.responseText;
         console.log('BetGol: XHR capturado!');
-
-        // LOG TEMPORÁRIO - mostra os primeiros 2000 caracteres do texto bruto
-        console.log('BetGol DEBUG texto bruto (primeiros 2000 chars):', this.responseText.substring(0, 2000));
+        console.log('BetGol DEBUG tamanho total:', texto.length);
+        console.log('BetGol DEBUG INICIO:', texto.substring(0, 1000));
+        console.log('BetGol DEBUG MEIO:', texto.substring(Math.floor(texto.length / 2) - 500, Math.floor(texto.length / 2) + 500));
+        console.log('BetGol DEBUG FIM:', texto.substring(texto.length - 1000));
+        console.log('BetGol DEBUG TEM SU=1:', texto.includes('SU=1'));
+        console.log('BetGol DEBUG TEM SU=2:', texto.includes('SU=2'));
 
         window.postMessage({
           tipo: 'BETGOL_DADOS_BRUTO',
-          dados: { url: this._betgolUrl, resposta: this.responseText, timestamp: new Date().toISOString() }
+          dados: { url: this._betgolUrl, resposta: texto, timestamp: new Date().toISOString() }
         }, "*");
       }
     });
