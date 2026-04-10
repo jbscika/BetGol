@@ -11,7 +11,6 @@ interface Props {
 
 interface Resultado {
   padrao: string
-  minuto: string
   pulos: number
   entradas: number
   greens: number
@@ -68,12 +67,39 @@ function detectarColunasLiga(dadosLiga: Partida[]): string[] {
 }
 
 // =========================================================================
+// FUNÇÃO: Converte a grade (linhas x colunas) em uma sequência linear de jogos
+// Cada jogo é uma "casa" — a sequência é: linha0/col0, linha0/col1...linha0/colN,
+// linha1/col0, linha1/col1... etc
+// Como as linhas estão ordenadas do mais recente para o mais antigo,
+// invertemos para ter ordem cronológica
+// =========================================================================
+function construirSequencia(linhas: Partida[], colunas: string[], maxHoras: number): { placar: { casa: number; fora: number }; str: string; hora: string; minuto: string }[] {
+  const seq: { placar: { casa: number; fora: number }; str: string; hora: string; minuto: string }[] = []
+
+  // Inverte para ordem cronológica (mais antigo primeiro)
+  const linhasOrdenadas = [...linhas].slice(0, maxHoras).reverse()
+
+  for (const linha of linhasOrdenadas) {
+    for (const col of colunas) {
+      const p = extrairPlacar(linha[col] as string)
+      if (!p) continue
+      seq.push({
+        placar: p,
+        str: `${p.casa}-${p.fora}`,
+        hora: (linha.hora as string) || '',
+        minuto: col.replace('tempo', ''),
+      })
+    }
+  }
+
+  return seq
+}
+
+// =========================================================================
 // ALGORITMO CORRETO:
-// - Cada "linha" = uma hora completa com vários minutos
-// - Cada "coluna" = um minuto fixo (tempo01, tempo04...)
-// - "Padrões seguidos" = o mesmo placar aparece N linhas (horas) seguidas
-//   na MESMA coluna (mesmo minuto)
-// - "Pulos" = quantas linhas (horas) depois você entra, na MESMA coluna
+// 1. Constrói uma sequência linear de todos os jogos em ordem cronológica
+// 2. Para cada placar que se repete N vezes seguidas,
+//    verifica o que acontece X casas depois (pulos)
 // =========================================================================
 function buscarPadroes(
   linhas: Partida[],
@@ -85,72 +111,60 @@ function buscarPadroes(
   liga: string,
   minPct: number
 ): Resultado[] {
-  const resultados: Resultado[] = []
+  const sequencia = construirSequencia(linhas, colunas, maxHoras)
+  if (sequencia.length < repeticoes + maxPulos + 1) return []
 
-  // Limita ao número de horas solicitado
-  const linhasLimitadas = linhas.slice(0, maxHoras)
+  // Agrupa resultados por (placar, pulos)
+  const contagem: Record<string, { entradas: number; greens: number; reds: number }> = {}
 
-  // Para cada coluna (minuto)
-  for (const col of colunas) {
-    // Extrai histórico desta coluna ao longo das linhas (horas)
-    const historico: ({ casa: number; fora: number; str: string } | null)[] = linhasLimitadas.map(l => {
-      const p = extrairPlacar(l[col] as string)
-      if (!p) return null
-      return { ...p, str: `${p.casa}-${p.fora}` }
-    })
+  for (let i = repeticoes - 1; i < sequencia.length - maxPulos; i++) {
+    // Verifica se as N casas anteriores têm o mesmo placar
+    const placarBase = sequencia[i].str
+    let padraoValido = true
 
-    if (historico.filter(Boolean).length < repeticoes + 3) continue
-
-    // Para cada pulo de 1 a maxPulos
-    for (let pulos = 1; pulos <= maxPulos; pulos++) {
-      let entradas = 0
-      let greens = 0
-      let reds = 0
-
-      // Percorre as linhas para encontrar padrões
-      // i = linha onde termina o padrão de N repetições
-      for (let i = repeticoes - 1; i < historico.length - pulos; i++) {
-        // Verifica se as N linhas anteriores têm o mesmo placar nesta coluna
-        let padraoValido = true
-        const primeiroPlacar = historico[i]?.str
-
-        if (!primeiroPlacar) continue
-
-        for (let r = 0; r < repeticoes; r++) {
-          const h = historico[i - r]
-          if (!h || h.str !== primeiroPlacar) {
-            padraoValido = false
-            break
-          }
-        }
-
-        if (!padraoValido) continue
-
-        // Linha alvo = i + pulos (horas depois)
-        const linhaAlvo = i + pulos
-        if (linhaAlvo >= historico.length) continue
-
-        const alvo = historico[linhaAlvo]
-        if (!alvo) continue
-
-        entradas++
-        if (verificarMercado(alvo, mercado)) greens++
-        else reds++
-      }
-
-      if (entradas >= 5 && (greens / entradas) * 100 >= minPct) {
-        resultados.push({
-          padrao: historico.find(h => h !== null)?.str || col,
-          minuto: col.replace('tempo', ''),
-          pulos,
-          entradas,
-          greens,
-          reds,
-          pct: Math.round((greens / entradas) * 100),
-          liga,
-        })
+    for (let r = 1; r < repeticoes; r++) {
+      if (sequencia[i - r].str !== placarBase) {
+        padraoValido = false
+        break
       }
     }
+
+    if (!padraoValido) continue
+
+    // Testa cada pulo de 1 a maxPulos
+    for (let pulo = 1; pulo <= maxPulos; pulo++) {
+      const idxAlvo = i + pulo
+      if (idxAlvo >= sequencia.length) break
+
+      const alvo = sequencia[idxAlvo]
+      const chave = `${placarBase}__${pulo}`
+
+      if (!contagem[chave]) contagem[chave] = { entradas: 0, greens: 0, reds: 0 }
+      contagem[chave].entradas++
+
+      if (verificarMercado(alvo.placar, mercado)) contagem[chave].greens++
+      else contagem[chave].reds++
+    }
+  }
+
+  // Filtra e formata resultados
+  const resultados: Resultado[] = []
+
+  for (const [chave, dados] of Object.entries(contagem)) {
+    if (dados.entradas < 5) continue
+    const pct = (dados.greens / dados.entradas) * 100
+    if (pct < minPct) continue
+
+    const [padrao, pulosStr] = chave.split('__')
+    resultados.push({
+      padrao,
+      pulos: parseInt(pulosStr),
+      entradas: dados.entradas,
+      greens: dados.greens,
+      reds: dados.reds,
+      pct: Math.round(pct),
+      liga,
+    })
   }
 
   return resultados.sort((a, b) => b.pct - a.pct || b.entradas - a.entradas)
@@ -314,7 +328,6 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                     <thead>
                       <tr style={{ background: azul, color: '#fff' }}>
                         <th style={{ padding: '10px', textAlign: 'left' }}>PADRÃO</th>
-                        <th style={{ padding: '10px', textAlign: 'center' }}>MINUTO</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>PULOS</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>LIGA</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>ENTRADAS</th>
@@ -327,7 +340,6 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                       {resultados.map((r, i) => (
                         <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee' }}>
                           <td style={{ padding: '10px', fontWeight: 700, color: azul }}>{r.padrao}</td>
-                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700 }}>{r.minuto}</td>
                           <td style={{ padding: '10px', textAlign: 'center' }}>{r.pulos}</td>
                           <td style={{ padding: '10px', textAlign: 'center', fontSize: '11px', color: '#666' }}>{r.liga.split(' ')[0]}</td>
                           <td style={{ padding: '10px', textAlign: 'center' }}>{r.entradas}</td>
