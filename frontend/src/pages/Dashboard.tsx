@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import GradeResultados from '../components/GradeResultados'
 import IATendencia from '../components/IATendencia'
 import JogosFuturos from '../components/JogosFuturos'
@@ -8,10 +8,48 @@ const LIGAS: Record<string, string> = {
   'Euro Cup': 'euro',
   'Premier League': 'premier',
   'Super Liga Sul-Americana': 'super',
+  'Express Cup': 'express',
 }
 
 export interface Partida {
   [key: string]: string | null
+}
+
+// =========================================================================
+// FUNÇÃO: Detecta automaticamente as colunas a partir dos dados
+// Cada liga tem um ciclo diferente (01,04,07... ou 02,05,08... ou 00,03,06...)
+// =========================================================================
+function detectarColunas(partidas: Partida[]): string[] {
+  if (!partidas || partidas.length === 0) {
+    return ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+  }
+
+  // Coleta todas as chaves tempoXX de todas as linhas
+  const colSet = new Set<number>()
+  for (const linha of partidas) {
+    for (const key of Object.keys(linha)) {
+      if (key.startsWith('tempo')) {
+        const num = parseInt(key.replace('tempo', ''))
+        if (!isNaN(num)) colSet.add(num)
+      }
+    }
+  }
+
+  if (colSet.size === 0) {
+    return ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
+  }
+
+  // Detecta o offset (0, 1 ou 2) baseado no menor minuto encontrado
+  const minutos = Array.from(colSet).sort((a, b) => a - b)
+  const offset = minutos[0] % 3
+
+  // Gera todas as colunas do ciclo
+  const colunas: string[] = []
+  for (let m = offset === 0 ? 0 : offset; m <= 59; m += 3) {
+    colunas.push(`tempo${String(m).padStart(2, '0')}`)
+  }
+
+  return colunas
 }
 
 function Dashboard() {
@@ -59,13 +97,10 @@ function Dashboard() {
       const url = `${API}/resultados-locais?liga=${encodeURIComponent(ligaSelecionada)}`
       const resp = await fetch(url)
       const partidas = await resp.json()
-      
       if (!Array.isArray(partidas)) return
-      
-      const colunasData = ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
-      
+      const colunasDetectadas = detectarColunas(partidas)
       setLinhas(partidas)
-      setColunas(colunasData)
+      setColunas(colunasDetectadas)
       setTotalPartidas(partidas.length)
     } catch (e) {
       console.error('Erro na atualização silenciosa:', e)
@@ -80,13 +115,10 @@ function Dashboard() {
       const url = `${API}/resultados-locais?liga=${encodeURIComponent(ligaSelecionada)}`
       const resp = await fetch(url)
       const partidas = await resp.json()
-      
       if (!Array.isArray(partidas)) throw new Error('Dados inválidos')
-      
-      const colunasData = ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
-      
+      const colunasDetectadas = detectarColunas(partidas)
       setLinhas(partidas)
-      setColunas(colunasData)
+      setColunas(colunasDetectadas)
       setTotalPartidas(partidas.length)
     } catch (e: any) {
       setErro('Erro ao carregar dados. Tente novamente.')
