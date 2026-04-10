@@ -15,9 +15,6 @@ function extrairLiga(url) {
   return null;
 }
 
-// =========================================================================
-// FUNÇÃO: Converte odd fracionária para decimal
-// =========================================================================
 function oddParaDecimal(odd) {
   if (!odd) return 999;
   const parts = odd.split('/');
@@ -29,98 +26,25 @@ function oddParaDecimal(odd) {
 }
 
 // =========================================================================
-// FUNÇÃO: Extrai o placar real do jogo anterior (SU=1 ou SU=2)
-// Quando o jogo do minuto 37 começa, o resultado do 34 aparece com SU=1
+// FUNÇÃO: Parseia UM bloco de evento (pode haver múltiplos no texto)
 // =========================================================================
-function extrairResultadoAnterior(texto) {
+function parsearBloco(bloco, liga) {
   try {
-    // Busca blocos de Resultado Correto onde algum PA tem SU=1 ou SU=2
-    const blocoPlacares = texto.match(/NA=Resultado Correto;[\s\S]*?(?=\|MG;SY=dz;NA=Resultado Correto - Grupo)/);
-    if (!blocoPlacares) return null;
-
-    // Busca placares com SU=1 ou SU=2 (resultado encerrado)
-    const ms = [...blocoPlacares[0].matchAll(/NA=(\d+-\d+);HD=;HA=;OD=(\d+\/\d+);SU=([12]);/g)];
-    if (ms.length === 0) return null;
-
-    // O placar com SU=1 ou SU=2 é o resultado real
-    // Se houver mais de um, pega o de menor odd (mais provável = resultado real)
-    let placarReal = null;
-    let menorOdd = 999;
-
-    for (const m of ms) {
-      const odd = oddParaDecimal(m[2]);
-      if (odd < menorOdd) {
-        menorOdd = odd;
-        placarReal = m[1];
-      }
-    }
-
-    return placarReal;
-  } catch (e) {
-    return null;
-  }
-}
-
-// =========================================================================
-// FUNÇÃO: Extrai o id_evento e data do jogo ANTERIOR
-// O jogo anterior aparece no texto quando o próximo começa
-// =========================================================================
-function extrairEventoAnterior(texto) {
-  try {
-    // Busca todos os eventos no texto
-    const eventos = [...texto.matchAll(/\|EV;ID=E(\d+);CM=.*?~(\d{14})/g)];
-    if (eventos.length < 2) return null;
-
-    // O primeiro evento é o atual, o segundo (ou mais) é o anterior
-    // Na verdade buscamos o evento que tem mercados com SU=1
-    // Verificamos qual evento tem SU=1 nos seus mercados
-    const blocos = texto.split(/(?=\|EV;ID=E)/);
-    
-    for (const bloco of blocos) {
-      if (bloco.includes('SU=1') || bloco.includes('SU=2')) {
-        const eventoMatch = bloco.match(/\|EV;ID=E(\d+);CM=.*?~(\d{14})/);
-        if (eventoMatch) {
-          return {
-            id_evento: eventoMatch[1],
-            data_evento: eventoMatch[2],
-          };
-        }
-      }
-    }
-    return null;
-  } catch (e) {
-    return null;
-  }
-}
-
-function parsearPartida(texto, liga) {
-  try {
-    const eventoMatch = texto.match(/\|EV;ID=E(\d+);/);
+    const eventoMatch = bloco.match(/\|EV;ID=E(\d+);CM=.*?~(\d{14})/);
     if (!eventoMatch) return null;
+
     const idEvento = eventoMatch[1];
+    const dataEvento = eventoMatch[2];
+    const hora = dataEvento.substring(8, 10);
+    const minuto = dataEvento.substring(10, 12);
+    const horario = `${hora}:${minuto}`;
+    const slot = `tempo${String(parseInt(minuto)).padStart(2, '0')}`;
 
-    // Extrai data_evento
-    let dataEvento = null;
-    const dataMatch1 = texto.match(/CM=.*?~(\d{14})/);
-    const dataMatch2 = texto.match(/ST=(\d{14})/);
-    const dataMatch3 = texto.match(/;TU=(\d{14})/);
-    if (dataMatch1) dataEvento = dataMatch1[1];
-    else if (dataMatch2) dataEvento = dataMatch2[1];
-    else if (dataMatch3) dataEvento = dataMatch3[1];
-    if (!dataEvento) {
-      const dataMatchFallback = texto.match(/(\d{14})/);
-      if (dataMatchFallback) dataEvento = dataMatchFallback[1];
-    }
+    // Detecta se o jogo está encerrado (RO=1)
+    const encerrado = bloco.includes('RO=1');
 
-    // Extrai hora e minuto
-    let hora = null, minuto = null, horario = null;
-    if (dataEvento && dataEvento.length >= 12) {
-      hora = dataEvento.substring(8, 10);
-      minuto = dataEvento.substring(10, 12);
-      horario = `${hora}:${minuto}`;
-    }
-
-    const blocoResultado = texto.match(/NA=Resultado Final[\s\S]*?(?=\|MG;)/);
+    // Extrai times
+    const blocoResultado = bloco.match(/NA=Resultado Final[\s\S]*?(?=\|MG;)/);
     let timeCasa = null, timeFora = null, oddCasa = null, oddEmpate = null, oddFora = null;
     if (blocoResultado) {
       const paMatches = [...blocoResultado[0].matchAll(/\|PA;ID=\d+;NA=([^;]+);SU=\d;OD=(\d+\/\d+);/g)];
@@ -129,8 +53,47 @@ function parsearPartida(texto, liga) {
       if (paMatches[2]) { timeFora = paMatches[2][1]; oddFora = paMatches[2][2]; }
     }
 
+    // Extrai placares possíveis
+    const placares = [];
+    const blocoPlacares = bloco.match(/NA=Resultado Correto;[\s\S]*?(?=\|MG;SY=dz;NA=Resultado Correto - Grupo)/);
+    if (blocoPlacares) {
+      const ms = [...blocoPlacares[0].matchAll(/NA=(\d+-\d+);HD=;HA=;OD=(\d+\/\d+);SU=\d;/g)];
+      for (const m of ms) placares.push({ placar: m[1], odd: m[2] });
+    }
+
+    // =========================================================================
+    // Se o jogo está encerrado (RO=1), extrai o placar REAL
+    // O placar real é o que tem SU=1 e menor odd (mais provável = aconteceu)
+    // =========================================================================
+    let placarReal = null;
+    if (encerrado && placares.length > 0) {
+      // Busca placares com SU=1 especificamente
+      const blocoPlacaresSU1 = bloco.match(/NA=Resultado Correto;[\s\S]*?(?=\|MG;SY=dz;NA=Resultado Correto - Grupo)/);
+      if (blocoPlacaresSU1) {
+        const ms = [...blocoPlacaresSU1[0].matchAll(/NA=(\d+-\d+);HD=;HA=;OD=(\d+\/\d+);SU=1;/g)];
+        if (ms.length > 0) {
+          // Pega o de menor odd (resultado real)
+          let menorOdd = 999;
+          for (const m of ms) {
+            const odd = oddParaDecimal(m[2]);
+            if (odd < menorOdd) {
+              menorOdd = odd;
+              placarReal = m[1];
+            }
+          }
+        }
+      }
+
+      // Se não achou com SU=1, usa o de menor odd geral
+      if (!placarReal && placares.length > 0) {
+        const ordenados = [...placares].sort((a, b) => oddParaDecimal(a.odd) - oddParaDecimal(b.odd));
+        placarReal = ordenados[0].placar;
+      }
+    }
+
+    // Extrai ambas marcam
     let ambasSim = null, ambasNao = null;
-    const blocoAmbas = texto.match(/NA=Para o Time Marcar[\s\S]*?(?=\|MG;)/);
+    const blocoAmbas = bloco.match(/NA=Para o Time Marcar[\s\S]*?(?=\|MG;)/);
     if (blocoAmbas) {
       const simMatch = blocoAmbas[0].match(/NA=Sim;SY=dc;PY=_d;CN=1;\|PA;ID=\d+;OD=(\d+\/\d+)/);
       const naoMatch = blocoAmbas[0].match(/NA=N[^;]+o;SY=dc;PY=_d;CN=1;\|PA;ID=\d+;OD=(\d+\/\d+)/);
@@ -138,19 +101,14 @@ function parsearPartida(texto, liga) {
       if (naoMatch) ambasNao = naoMatch[1];
     }
 
+    // Extrai over/under 2.5
     let mais25 = null, menos25 = null;
-    const blocoGols = texto.match(/NA=2\.5[\s\S]*?NA=Mais de;SY=dg[\s\S]*?OD=(\d+\/\d+)[\s\S]*?NA=Menos de;SY=dg[\s\S]*?OD=(\d+\/\d+)/);
+    const blocoGols = bloco.match(/NA=2\.5[\s\S]*?NA=Mais de;SY=dg[\s\S]*?OD=(\d+\/\d+)[\s\S]*?NA=Menos de;SY=dg[\s\S]*?OD=(\d+\/\d+)/);
     if (blocoGols) { mais25 = blocoGols[1]; menos25 = blocoGols[2]; }
 
-    const placares = [];
-    const blocoPlacares = texto.match(/NA=Resultado Correto;[\s\S]*?(?=\|MG;SY=dz;NA=Resultado Correto - Grupo)/);
-    if (blocoPlacares) {
-      const ms = [...blocoPlacares[0].matchAll(/NA=(\d+-\d+);HD=;HA=;OD=(\d+\/\d+);SU=\d;/g)];
-      for (const m of ms) placares.push({ placar: m[1], odd: m[2] });
-    }
-
+    // Extrai primeiro marcador
     const primeiroMarcador = [];
-    const blocoMarcador = texto.match(/NA=Primeiro Marcador de Gol[\s\S]*?(?=\|MG;)/);
+    const blocoMarcador = bloco.match(/NA=Primeiro Marcador de Gol[\s\S]*?(?=\|MG;)/);
     if (blocoMarcador) {
       const ms = [...blocoMarcador[0].matchAll(/NA=([^;]+);SU=\d;OD=(\d+\/\d+);/g)];
       for (const m of ms) {
@@ -160,9 +118,6 @@ function parsearPartida(texto, liga) {
       }
     }
 
-    // Slot tempoXX do jogo atual
-    const slot = minuto ? `tempo${String(parseInt(minuto)).padStart(2, '0')}` : null;
-
     const partida = {
       liga,
       id_evento: idEvento,
@@ -171,6 +126,7 @@ function parsearPartida(texto, liga) {
       hora,
       minuto,
       horario,
+      encerrado,
       time_casa: timeCasa || 'Casa',
       time_fora: timeFora || 'Fora',
       odd_casa: oddCasa,
@@ -182,82 +138,80 @@ function parsearPartida(texto, liga) {
       menos_2_5: menos25,
       placares,
       primeiro_marcador: primeiroMarcador,
+      [slot]: placarReal,
     };
 
-    // Adiciona slot sem placar real (será atualizado quando o próximo jogo capturar)
-    if (slot) partida[slot] = null;
+    if (placarReal) {
+      partida.placar_real = placarReal;
+      console.log(`BetGol: Resultado REAL capturado! ${liga} | ${timeCasa} x ${timeFora} às ${horario} = ${placarReal}`);
+    }
 
     return partida;
   } catch (e) {
-    console.error('BetGol Erro parsear:', e);
+    console.error('BetGol Erro parsear bloco:', e);
     return null;
   }
 }
 
 // =========================================================================
-// FUNÇÃO: Extrai e envia o resultado real do jogo anterior
+// FUNÇÃO: Parseia o texto completo — pode conter múltiplos eventos
 // =========================================================================
-async function processarResultadoAnterior(texto, liga) {
-  try {
-    const placarReal = extrairResultadoAnterior(texto);
-    if (!placarReal) return;
+function parsearTexto(texto, liga) {
+  const partidas = [];
 
-    const eventoAnterior = extrairEventoAnterior(texto);
-    if (!eventoAnterior) return;
+  // Divide o texto em blocos por evento
+  const blocos = texto.split(/(?=\|EV;ID=E)/);
 
-    const { id_evento, data_evento } = eventoAnterior;
-    const hora = data_evento.substring(8, 10);
-    const minuto = data_evento.substring(10, 12);
-    const slot = `tempo${String(parseInt(minuto)).padStart(2, '0')}`;
-
-    console.log(`BetGol: Resultado anterior capturado! ${liga} | ${slot} = ${placarReal}`);
-
-    // Envia atualização do resultado real para o backend
-    await fetch(`${BACKEND_URL}/atualizar-resultado`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        liga,
-        id_evento,
-        data_evento,
-        hora,
-        minuto,
-        slot,
-        placar_real: placarReal,
-      }),
-    }).catch(() => {});
-  } catch (e) {
-    console.error('BetGol erro resultado anterior:', e);
+  for (const bloco of blocos) {
+    if (!bloco.includes('|EV;ID=E')) continue;
+    const partida = parsearBloco(bloco, liga);
+    if (partida) partidas.push(partida);
   }
+
+  return partidas;
 }
 
 async function enviarParaBackend(texto, url, liga) {
   try {
-    const partida = parsearPartida(texto, liga);
-    if (!partida) return;
+    const partidas = parsearTexto(texto, liga);
+    if (partidas.length === 0) return;
 
-    console.log(`BetGol: Enviando ${partida.time_casa} x ${partida.time_fora} (${liga}) | data_evento: ${partida.data_evento}`);
+    for (const partida of partidas) {
+      console.log(`BetGol: Enviando ${partida.time_casa} x ${partida.time_fora} (${liga}) às ${partida.horario} | encerrado: ${partida.encerrado} | placar: ${partida.placar_real || 'pendente'}`);
 
-    const resp = await fetch(`${BACKEND_URL}/capturar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(partida),
-    });
-
-    if (resp.ok) {
-      chrome.action.setBadgeText({ text: 'OK' });
-      chrome.action.setBadgeBackgroundColor({ color: '#00c853' });
-      setTimeout(() => chrome.action.setBadgeText({ text: '' }), 3000);
-    } else {
-      chrome.action.setBadgeText({ text: 'ERR' });
-      chrome.action.setBadgeBackgroundColor({ color: '#c0392b' });
+      // Se o jogo está encerrado, usa rota de atualizar resultado
+      if (partida.encerrado && partida.placar_real) {
+        await fetch(`${BACKEND_URL}/atualizar-resultado`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            liga: partida.liga,
+            id_evento: partida.id_evento,
+            data_evento: partida.data_evento,
+            hora: partida.hora,
+            minuto: partida.minuto,
+            slot: `tempo${String(parseInt(partida.minuto)).padStart(2, '0')}`,
+            placar_real: partida.placar_real,
+          }),
+        }).catch(() => {});
+      } else {
+        // Jogo em andamento — salva normalmente
+        await fetch(`${BACKEND_URL}/capturar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(partida),
+        }).catch(() => {});
+      }
     }
 
-    // Processa resultado do jogo anterior em paralelo
-    await processarResultadoAnterior(texto, liga);
+    chrome.action.setBadgeText({ text: 'OK' });
+    chrome.action.setBadgeBackgroundColor({ color: '#00c853' });
+    setTimeout(() => chrome.action.setBadgeText({ text: '' }), 3000);
 
   } catch (e) {
     console.error('BetGol erro envio API:', e);
+    chrome.action.setBadgeText({ text: 'ERR' });
+    chrome.action.setBadgeBackgroundColor({ color: '#c0392b' });
   }
 }
 
