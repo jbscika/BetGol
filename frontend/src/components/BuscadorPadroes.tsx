@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Partida } from '../pages/Dashboard'
 
 interface Props {
@@ -11,9 +11,10 @@ interface Props {
 
 interface Resultado {
   padrao: string
+  minuto: string
   pulos: number
+  minutoEntrada: string
   entradas: number
-  resultados: number
   greens: number
   reds: number
   pct: number
@@ -54,6 +55,19 @@ function verificarMercado(p: { casa: number; fora: number }, mercado: string): b
   }
 }
 
+function detectarColunasLiga(dadosLiga: Partida[]): string[] {
+  const colSet = new Set<number>()
+  for (const linha of dadosLiga) {
+    for (const key of Object.keys(linha)) {
+      if (key.startsWith('tempo')) {
+        const num = parseInt(key.replace('tempo', ''))
+        if (!isNaN(num)) colSet.add(num)
+      }
+    }
+  }
+  return Array.from(colSet).sort((a, b) => a - b).map(n => `tempo${String(n).padStart(2, '0')}`)
+}
+
 function buscarPadroes(
   linhas: Partida[],
   colunas: string[],
@@ -64,19 +78,17 @@ function buscarPadroes(
 ): Resultado[] {
   const resultados: Resultado[] = []
 
-  // Para cada coluna (minuto)
   for (let colIdx = 0; colIdx < colunas.length; colIdx++) {
     const col = colunas[colIdx]
 
-    // Extrai todos os placares desta coluna ao longo das linhas
-    const historico: ({ casa: number; fora: number } | null)[] = linhas.map(l => extrairPlacar(l[col] as string))
-    const validos = historico.filter(Boolean) as { casa: number; fora: number }[]
+    // Extrai histórico desta coluna
+    const historico = linhas.map(l => extrairPlacar(l[col] as string))
+    const validos = historico.filter(Boolean)
     if (validos.length < repeticoes + 3) continue
 
-    // Para cada número de pulos (1 a maxPulos)
-    for (let pulos = 0; pulos <= maxPulos; pulos++) {
-      // Coluna alvo (depois dos pulos)
-      const colAlvoIdx = colIdx + pulos + 1
+    // Para cada pulo de 1 a maxPulos
+    for (let pulos = 1; pulos <= maxPulos; pulos++) {
+      const colAlvoIdx = colIdx + pulos
       if (colAlvoIdx >= colunas.length) continue
       const colAlvo = colunas[colAlvoIdx]
 
@@ -86,29 +98,22 @@ function buscarPadroes(
 
       // Verifica padrão em cada linha
       for (let linhaIdx = 0; linhaIdx <= linhas.length - repeticoes - 1; linhaIdx++) {
-        // Verifica se as últimas N linhas nesta coluna têm o mesmo resultado no mercado
+        // Verifica se as últimas N linhas têm o mesmo placar consecutivo
         let padraoValido = true
         let primeiroPlacar: string | null = null
 
         for (let r = 0; r < repeticoes; r++) {
           const p = extrairPlacar(linhas[linhaIdx + r][col] as string)
           if (!p) { padraoValido = false; break }
-
-          const resultado = verificarMercado(p, mercado)
           const placarStr = `${p.casa}-${p.fora}`
-
-          if (r === 0) {
-            primeiroPlacar = placarStr
-          }
-
-          // Para padrão de placar específico, todos devem ser iguais
+          if (r === 0) primeiroPlacar = placarStr
           if (placarStr !== primeiroPlacar) { padraoValido = false; break }
         }
 
         if (!padraoValido || !primeiroPlacar) continue
 
         // Verifica resultado na coluna alvo
-        const linhaAlvo = linhaIdx + repeticoes
+        const linhaAlvo = linhaIdx + repeticoes - 1
         if (linhaAlvo >= linhas.length) continue
 
         const pAlvo = extrairPlacar(linhas[linhaAlvo][colAlvo] as string)
@@ -119,12 +124,14 @@ function buscarPadroes(
         else reds++
       }
 
-      if (entradas >= 5 && greens / entradas >= 0.7) {
+      // Só mostra padrões com pelo menos 5 entradas e 95%+ de acerto
+      if (entradas >= 5 && greens / entradas >= 0.95) {
         resultados.push({
-          padrao: `${col.replace('tempo', '')}→${colAlvo.replace('tempo', '')}`,
+          padrao: primeiroPlacar || col,
+          minuto: col.replace('tempo', ''),
           pulos,
+          minutoEntrada: colAlvo.replace('tempo', ''),
           entradas,
-          resultados: entradas,
           greens,
           reds,
           pct: Math.round(greens / entradas * 100),
@@ -134,14 +141,14 @@ function buscarPadroes(
     }
   }
 
-  return resultados.sort((a, b) => b.pct - a.pct || b.entradas - a.entradas).slice(0, 20)
+  return resultados.sort((a, b) => b.pct - a.pct || b.entradas - a.entradas)
 }
 
 export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTodasLigas }: Props) {
   const [aberto, setAberto] = useState(false)
   const [mercado, setMercado] = useState('Over 2.5')
   const [repeticoes, setRepeticoes] = useState(3)
-  const [maxPulos, setMaxPulos] = useState(5)
+  const [maxPulos, setMaxPulos] = useState(10)
   const [ligasSelecionadas, setLigasSelecionadas] = useState<string[]>(ligas || [])
   const [buscando, setBuscando] = useState(false)
   const [resultados, setResultados] = useState<Resultado[]>([])
@@ -170,26 +177,14 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
         for (const [nomeLiga, dadosLiga] of Object.entries(dadosTodasLigas)) {
           if (!ligasSelecionadas.includes(nomeLiga)) continue
           if (!dadosLiga || dadosLiga.length === 0) continue
-
-          // Detecta colunas da liga
-          const colSet = new Set<number>()
-          for (const linha of dadosLiga) {
-            for (const key of Object.keys(linha)) {
-              if (key.startsWith('tempo')) {
-                const num = parseInt(key.replace('tempo', ''))
-                if (!isNaN(num)) colSet.add(num)
-              }
-            }
-          }
-          const colsLiga = Array.from(colSet).sort((a, b) => a - b).map(n => `tempo${String(n).padStart(2, '0')}`)
-
+          const colsLiga = detectarColunasLiga(dadosLiga)
           const r = buscarPadroes(dadosLiga, colsLiga, mercado, repeticoes, maxPulos, nomeLiga)
           todos.push(...r)
         }
       }
 
       todos.sort((a, b) => b.pct - a.pct || b.entradas - a.entradas)
-      setResultados(todos.slice(0, 30))
+      setResultados(todos.slice(0, 50))
       setBuscando(false)
     }, 100)
   }
@@ -200,20 +195,18 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
 
   return (
     <>
-      {/* BOTÃO DE ABERTURA */}
       <button
         onClick={() => setAberto(true)}
         style={{
           background: azul, color: '#fff', border: 'none',
           borderRadius: '6px', padding: '8px 16px',
           fontWeight: 700, fontSize: '12px', cursor: 'pointer',
-          letterSpacing: '1px',
+          letterSpacing: '1px', alignSelf: 'flex-start',
         }}
       >
         🔍 BUSCADOR DE PADRÕES
       </button>
 
-      {/* MODAL */}
       {aberto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -223,7 +216,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
         }}>
           <div style={{
             background: '#fff', borderRadius: '12px',
-            width: '100%', maxWidth: '900px', maxHeight: '90vh',
+            width: '100%', maxWidth: '950px', maxHeight: '90vh',
             overflow: 'auto', padding: '24px',
           }}>
             {/* HEADER */}
@@ -245,14 +238,14 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                 <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>PADRÕES SEGUIDOS</label>
                 <select value={repeticoes} onChange={e => setRepeticoes(parseInt(e.target.value))}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-                  {[2, 3, 4, 5].map(n => <option key={n} value={n}>{n}x seguidos</option>)}
+                  {[2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}x seguidos</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MAX PULOS</label>
                 <select value={maxPulos} onChange={e => setMaxPulos(parseInt(e.target.value))}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-                  {[0, 1, 2, 3, 5, 7, 10].map(n => <option key={n} value={n}>{n} pulos</option>)}
+                  {[5, 10, 15, 20, 30, 40, 50, 60].map(n => <option key={n} value={n}>{n} pulos</option>)}
                 </select>
               </div>
             </div>
@@ -278,46 +271,56 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
             <button onClick={buscar} disabled={buscando} style={{
               width: '100%', padding: '12px', background: verde, color: '#fff',
               border: 'none', borderRadius: '8px', fontWeight: 800,
-              fontSize: '14px', cursor: 'pointer', marginBottom: '20px',
-              letterSpacing: '1px',
+              fontSize: '14px', cursor: buscando ? 'not-allowed' : 'pointer',
+              marginBottom: '20px', letterSpacing: '1px',
+              opacity: buscando ? 0.7 : 1,
             }}>
-              {buscando ? 'Buscando...' : '🔍 BUSCAR PADRÕES'}
+              {buscando ? '⏳ Buscando padrões...' : '🔍 BUSCAR PADRÕES'}
             </button>
 
             {/* RESULTADOS */}
             {resultados.length > 0 && (
               <div>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', marginBottom: '10px' }}>
-                  {resultados.length} padrões encontrados
+                  {resultados.length} padrões encontrados — ordenados por % de acerto
                 </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                  <thead>
-                    <tr style={{ background: azul, color: '#fff' }}>
-                      <th style={{ padding: '10px', textAlign: 'left' }}>PADRÃO</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>LIGA</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>PULOS</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>ENTRADAS</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>GREENS</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>REDS</th>
-                      <th style={{ padding: '10px', textAlign: 'center' }}>%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resultados.map((r, i) => (
-                      <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '10px', fontWeight: 700, color: azul }}>{r.padrao}</td>
-                        <td style={{ padding: '10px', textAlign: 'center', fontSize: '11px', color: '#666' }}>{r.liga.split(' ')[0]}</td>
-                        <td style={{ padding: '10px', textAlign: 'center' }}>{r.pulos}</td>
-                        <td style={{ padding: '10px', textAlign: 'center' }}>{r.entradas}</td>
-                        <td style={{ padding: '10px', textAlign: 'center', color: verde, fontWeight: 700 }}>{r.greens}</td>
-                        <td style={{ padding: '10px', textAlign: 'center', color: vermelho, fontWeight: 700 }}>{r.reds}</td>
-                        <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: r.pct >= 80 ? verde : r.pct >= 70 ? '#b8960c' : vermelho }}>
-                          {r.pct}%
-                        </td>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ background: azul, color: '#fff' }}>
+                        <th style={{ padding: '10px', textAlign: 'left' }}>PADRÃO</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>MIN PADRÃO</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>PULOS</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>MIN ENTRADA</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>LIGA</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>ENTRADAS</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>GREENS</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>REDS</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>%</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {resultados.map((r, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '10px', fontWeight: 700, color: azul }}>{r.padrao}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700 }}>{r.minuto}</td>
+                          <td style={{ padding: '10px', textAlign: 'center' }}>{r.pulos}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, color: verde }}>{r.minutoEntrada}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', fontSize: '11px', color: '#666' }}>{r.liga.split(' ')[0]}</td>
+                          <td style={{ padding: '10px', textAlign: 'center' }}>{r.entradas}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', color: verde, fontWeight: 700 }}>{r.greens}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', color: vermelho, fontWeight: 700 }}>{r.reds}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800,
+                            color: r.pct >= 95 ? verde : r.pct >= 90 ? '#b8960c' : vermelho,
+                            fontSize: '14px',
+                          }}>
+                            {r.pct}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
