@@ -74,7 +74,8 @@ function buscarPadroes(
   mercado: string,
   repeticoes: number,
   maxPulos: number,
-  liga: string
+  liga: string,
+  minPct: number = 70
 ): Resultado[] {
   const resultados: Resultado[] = []
 
@@ -124,8 +125,8 @@ function buscarPadroes(
         else reds++
       }
 
-      // Só mostra padrões com pelo menos 5 entradas e 95%+ de acerto
-      if (entradas >= 5 && greens / entradas >= 0.95) {
+      // Só mostra padrões com pelo menos 5 entradas e minPct% de acerto
+      if (entradas >= 5 && greens / entradas >= minPct / 100) {
         resultados.push({
           padrao: primeiroPlacar || col,
           minuto: col.replace('tempo', ''),
@@ -149,6 +150,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
   const [mercado, setMercado] = useState('Over 2.5')
   const [repeticoes, setRepeticoes] = useState(3)
   const [maxPulos, setMaxPulos] = useState(10)
+  const [minPct, setMinPct] = useState(70)
   const [ligasSelecionadas, setLigasSelecionadas] = useState<string[]>(ligas || [])
   const [buscando, setBuscando] = useState(false)
   const [resultados, setResultados] = useState<Resultado[]>([])
@@ -168,7 +170,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
 
       // Busca na liga atual
       if (liga && ligasSelecionadas.includes(liga) && linhas.length > 0) {
-        const r = buscarPadroes(linhas, colunas, mercado, repeticoes, maxPulos, liga)
+        const r = buscarPadroes(linhas, colunas, mercado, repeticoes, maxPulos, liga, minPct)
         todos.push(...r)
       }
 
@@ -178,7 +180,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
           if (!ligasSelecionadas.includes(nomeLiga)) continue
           if (!dadosLiga || dadosLiga.length === 0) continue
           const colsLiga = detectarColunasLiga(dadosLiga)
-          const r = buscarPadroes(dadosLiga, colsLiga, mercado, repeticoes, maxPulos, nomeLiga)
+          const r = buscarPadroes(dadosLiga, colsLiga, mercado, repeticoes, maxPulos, nomeLiga, minPct)
           todos.push(...r)
         }
       }
@@ -246,6 +248,13 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                 <select value={maxPulos} onChange={e => setMaxPulos(parseInt(e.target.value))}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
                   {[5, 10, 15, 20, 30, 40, 50, 60].map(n => <option key={n} value={n}>{n} pulos</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>% MÍNIMO</label>
+                <select value={minPct} onChange={e => setMinPct(parseInt(e.target.value))}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
+                  {[70, 75, 80, 85, 90, 95, 100].map(n => <option key={n} value={n}>{n}%</option>)}
                 </select>
               </div>
             </div>
