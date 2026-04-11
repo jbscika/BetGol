@@ -10,30 +10,22 @@ interface Props {
 }
 
 interface Resultado {
-  padrao: string       // placar que disparou ex: "3-2"
-  pulos: number        // quantas casas depois
-  mercado: string      // mercado que bateu ex: "Over 2.5"
-  entradas: number     // total de vezes testado
-  greens: number       // acertos
-  reds: number         // erros
-  pct: number          // % de acerto
+  padrao: string
+  pulos: number
+  gale: number
+  entradas: number
+  greens: number
+  reds: number
+  pct: number
   liga: string
-  ativoAgora: boolean  // padrão está acontecendo agora?
+  ativoAgora: boolean
 }
 
 const MERCADOS = [
-  { nome: 'Over 0.5',        fn: (c: number, f: number) => (c + f) > 0.5 },
-  { nome: 'Over 1.5',        fn: (c: number, f: number) => (c + f) > 1.5 },
-  { nome: 'Over 2.5',        fn: (c: number, f: number) => (c + f) > 2.5 },
-  { nome: 'Over 3.5',        fn: (c: number, f: number) => (c + f) > 3.5 },
-  { nome: 'Under 1.5',       fn: (c: number, f: number) => (c + f) < 1.5 },
-  { nome: 'Under 2.5',       fn: (c: number, f: number) => (c + f) < 2.5 },
-  { nome: 'Under 3.5',       fn: (c: number, f: number) => (c + f) < 3.5 },
-  { nome: 'Ambas Marcam Sim',fn: (c: number, f: number) => c > 0 && f > 0 },
-  { nome: 'Ambas Marcam Não',fn: (c: number, f: number) => !(c > 0 && f > 0) },
-  { nome: 'Vitória Casa',    fn: (c: number, f: number) => c > f },
-  { nome: 'Empate',          fn: (c: number, f: number) => c === f },
-  { nome: 'Vitória Fora',    fn: (c: number, f: number) => f > c },
+  'Over 0.5', 'Over 1.5', 'Over 2.5', 'Over 3.5',
+  'Under 1.5', 'Under 2.5', 'Under 3.5',
+  'Ambas Marcam Sim', 'Ambas Marcam Não',
+  'Vitória Casa', 'Vitória Fora',
 ]
 
 function extrairPlacar(val: string | null): { casa: number; fora: number } | null {
@@ -42,6 +34,24 @@ function extrairPlacar(val: string | null): { casa: number; fora: number } | nul
   const m = linha.match(/(\d+)\s*-\s*(\d+)/)
   if (!m) return null
   return { casa: parseInt(m[1]), fora: parseInt(m[2]) }
+}
+
+function verificarMercado(p: { casa: number; fora: number }, mercado: string): boolean {
+  const gols = p.casa + p.fora
+  switch (mercado) {
+    case 'Over 0.5': return gols > 0.5
+    case 'Over 1.5': return gols > 1.5
+    case 'Over 2.5': return gols > 2.5
+    case 'Over 3.5': return gols > 3.5
+    case 'Under 1.5': return gols < 1.5
+    case 'Under 2.5': return gols < 2.5
+    case 'Under 3.5': return gols < 3.5
+    case 'Ambas Marcam Sim': return p.casa > 0 && p.fora > 0
+    case 'Ambas Marcam Não': return !(p.casa > 0 && p.fora > 0)
+    case 'Vitória Casa': return p.casa > p.fora
+    case 'Vitória Fora': return p.fora > p.casa
+    default: return false
+  }
 }
 
 function detectarColunasLiga(dadosLiga: Partida[]): string[] {
@@ -73,8 +83,10 @@ function construirSequencia(linhas: Partida[], colunas: string[], maxHoras: numb
 function buscarPadroes(
   linhas: Partida[],
   colunas: string[],
+  mercado: string,
   maxPulos: number,
   maxHoras: number,
+  maxGale: number,
   minEntradas: number,
   liga: string,
   minPct: number
@@ -82,7 +94,7 @@ function buscarPadroes(
   const seq = construirSequencia(linhas, colunas, maxHoras)
   if (seq.length < 10) return []
 
-  // Estrutura: chave = "placar__pulos__mercado"
+  // chave = "placar__pulos__gale"
   const contagem: Record<string, { greens: number; total: number }> = {}
 
   for (let i = 0; i < seq.length - 1; i++) {
@@ -94,17 +106,33 @@ function buscarPadroes(
 
       const alvo = seq[idxAlvo]
 
-      // Testa todos os mercados para essa posição
-      for (const m of MERCADOS) {
-        const chave = `${placar}__${pulo}__${m.nome}`
-        if (!contagem[chave]) contagem[chave] = { greens: 0, total: 0 }
-        contagem[chave].total++
-        if (m.fn(alvo.casa, alvo.fora)) contagem[chave].greens++
+      // Sem gale
+      const chaveBase = `${placar}__${pulo}__0`
+      if (!contagem[chaveBase]) contagem[chaveBase] = { greens: 0, total: 0 }
+      contagem[chaveBase].total++
+
+      if (verificarMercado(alvo, mercado)) {
+        contagem[chaveBase].greens++
+      } else if (maxGale > 0) {
+        // Testa gales
+        for (let g = 1; g <= maxGale; g++) {
+          const idxGale = idxAlvo + g
+          if (idxGale >= seq.length) break
+
+          const chaveGale = `${placar}__${pulo}__${g}`
+          if (!contagem[chaveGale]) contagem[chaveGale] = { greens: 0, total: 0 }
+          contagem[chaveGale].total++
+
+          if (verificarMercado(seq[idxGale], mercado)) {
+            contagem[chaveGale].greens++
+            break
+          }
+        }
       }
     }
   }
 
-  // Sequência recente para detectar ativo agora
+  // Detecta padrão ativo agora
   const seqRecente = construirSequencia(linhas, colunas, 2)
   const ultimoPlacar = seqRecente.length > 0 ? seqRecente[seqRecente.length - 1].str : ''
 
@@ -118,12 +146,12 @@ function buscarPadroes(
     const partes = chave.split('__')
     const padrao = partes[0]
     const pulos = parseInt(partes[1])
-    const mercado = partes[2]
+    const gale = parseInt(partes[2])
 
     resultados.push({
       padrao,
       pulos,
-      mercado,
+      gale,
       entradas: dados.total,
       greens: dados.greens,
       reds: dados.total - dados.greens,
@@ -142,8 +170,10 @@ function buscarPadroes(
 
 export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTodasLigas }: Props) {
   const [aberto, setAberto] = useState(false)
+  const [mercado, setMercado] = useState('Over 2.5')
   const [maxPulos, setMaxPulos] = useState(20)
   const [maxHoras, setMaxHoras] = useState(24)
+  const [maxGale, setMaxGale] = useState(0)
   const [minEntradas, setMinEntradas] = useState(10)
   const [minPct, setMinPct] = useState(85)
   const [ligasSelecionadas, setLigasSelecionadas] = useState<string[]>(ligas || [])
@@ -164,7 +194,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
       const todos: Resultado[] = []
 
       if (liga && ligasSelecionadas.includes(liga) && linhas.length > 0) {
-        const r = buscarPadroes(linhas, colunas, maxPulos, maxHoras, minEntradas, liga, minPct)
+        const r = buscarPadroes(linhas, colunas, mercado, maxPulos, maxHoras, maxGale, minEntradas, liga, minPct)
         todos.push(...r)
       }
 
@@ -173,7 +203,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
           if (!ligasSelecionadas.includes(nomeLiga)) continue
           if (!dadosLiga || dadosLiga.length === 0) continue
           const colsLiga = detectarColunasLiga(dadosLiga)
-          const r = buscarPadroes(dadosLiga, colsLiga, maxPulos, maxHoras, minEntradas, nomeLiga, minPct)
+          const r = buscarPadroes(dadosLiga, colsLiga, mercado, maxPulos, maxHoras, maxGale, minEntradas, nomeLiga, minPct)
           todos.push(...r)
         }
       }
@@ -226,12 +256,26 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
             </div>
 
             {/* FILTROS */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MERCADO</label>
+                <select value={mercado} onChange={e => setMercado(e.target.value)}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '12px' }}>
+                  {MERCADOS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
               <div>
                 <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MAX PULOS</label>
                 <select value={maxPulos} onChange={e => setMaxPulos(parseInt(e.target.value))}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '12px' }}>
                   {[5, 10, 15, 20, 30, 40, 50, 60].map(n => <option key={n} value={n}>{n} pulos</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>GALE</label>
+                <select value={maxGale} onChange={e => setMaxGale(parseInt(e.target.value))}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '12px' }}>
+                  {[0, 1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n === 0 ? 'Sem gale' : `G${n}`}</option>)}
                 </select>
               </div>
               <div>
@@ -282,7 +326,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
               marginBottom: '20px', letterSpacing: '1px',
               opacity: buscando ? 0.7 : 1,
             }}>
-              {buscando ? '⏳ Analisando todos os padrões...' : '🔍 BUSCAR PADRÕES'}
+              {buscando ? '⏳ Buscando padrões...' : '🔍 BUSCAR PADRÕES'}
             </button>
 
             {/* ALERTA PADRÕES ATIVOS */}
@@ -306,7 +350,8 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                       <span style={{ color: '#888', fontSize: '11px', margin: '0 6px' }}>→</span>
                       <span style={{ fontWeight: 700, color: '#333', fontSize: '13px' }}>{r.pulos} pulos</span>
                       <span style={{ color: '#888', fontSize: '11px', margin: '0 6px' }}>→</span>
-                      <span style={{ fontWeight: 700, color: verde, fontSize: '13px' }}>{r.mercado}</span>
+                      <span style={{ fontWeight: 700, color: verde, fontSize: '13px' }}>{mercado}</span>
+                      {r.gale > 0 && <span style={{ color: amarelo, fontSize: '11px', marginLeft: '8px' }}>G{r.gale}</span>}
                       <span style={{ color: '#666', fontSize: '11px', marginLeft: '8px' }}>({r.liga.split(' ')[0]})</span>
                     </div>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -326,7 +371,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
             {resultados.length > 0 && (
               <div>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', marginBottom: '10px' }}>
-                  {resultados.length} padrões encontrados — ordenados por % de acerto
+                  {resultados.length} padrões encontrados
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
@@ -334,7 +379,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                       <tr style={{ background: azul, color: '#fff' }}>
                         <th style={{ padding: '10px', textAlign: 'left' }}>PLACAR</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>PULOS</th>
-                        <th style={{ padding: '10px', textAlign: 'left' }}>MERCADO</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>GALE</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>LIGA</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>ENTRADAS</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>GREENS</th>
@@ -351,7 +396,9 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                         }}>
                           <td style={{ padding: '10px', fontWeight: 800, color: azul, fontSize: '14px' }}>{r.padrao}</td>
                           <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700 }}>{r.pulos}</td>
-                          <td style={{ padding: '10px', fontWeight: 600, color: verde }}>{r.mercado}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', color: r.gale > 0 ? amarelo : '#999' }}>
+                            {r.gale === 0 ? '-' : `G${r.gale}`}
+                          </td>
                           <td style={{ padding: '10px', textAlign: 'center', fontSize: '11px', color: '#666' }}>{r.liga.split(' ')[0]}</td>
                           <td style={{ padding: '10px', textAlign: 'center' }}>{r.entradas}</td>
                           <td style={{ padding: '10px', textAlign: 'center', color: verde, fontWeight: 700 }}>{r.greens}</td>
