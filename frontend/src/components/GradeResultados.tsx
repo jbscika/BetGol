@@ -23,7 +23,6 @@ interface Tendencia {
 
 const FILTRO_VAZIO = { over: '', under: '', ambas: '', resultado: '' }
 
-// === FUNÇÃO DE EXTRAÇÃO CORRIGIDA (LÊ OS DADOS DO FIREBASE) ===
 function extrairPlacar(val: string | null): PlacarInfo | null {
   if (!val) return null
   const linha = typeof val === 'string' ? val.split('</br>')[0].split('<br>')[0].trim() : String(val)
@@ -72,7 +71,6 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const pO35 = Math.round(validos.filter(p => p.over35).length / n * 100)
     const pAmbas = Math.round(validos.filter(p => p.ambasSim).length / n * 100)
     const pCasa = Math.round(validos.filter(p => p.casaVence).length / n * 100)
-    const pEmp = Math.round(validos.filter(p => p.empate).length / n * 100)
     const pFora = Math.round(validos.filter(p => p.foraVence).length / n * 100)
     const mediaG = Math.round(validos.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
     const mediaGols2 = validos.reduce((s, p) => s + p.gols * p.gols, 0) / n
@@ -153,7 +151,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     if (tipoIA === 1) {
       const ant = placares[1]
       if (ant) {
-        if (atual.over25 === ant.over25) { boost += atual.over25 ? -10 : 12; motivos.push(atual.over25 ? '2xG->rev' : '2xR->corr') }
+        if (atual.over25 === ant.over25) { boost += atual.over25 ? -10 : 12 }
         else { boost += atual.over25 ? 4 : -4 }
       }
     } else if (tipoIA === 2) {
@@ -162,7 +160,6 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         const reds = [ant2.over25, ant1.over25, atual.over25].filter(r => !r).length
         if (reds === 3) { boost += 20; motivos.push('3xRED') }
         else if (reds === 0) { boost -= 18; motivos.push('3xGREEN') }
-        else if (ant1.over25 === atual.over25) { boost += atual.over25 ? -8 : 10 }
       }
     } else {
       const ant1 = placares[1], ant2 = placares[2], ant3 = placares[3]
@@ -172,9 +169,6 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         else if (reds === 0) { boost -= 22; motivos.push('4xGREEN') }
         else if (reds === 3) { boost += 16; motivos.push('3/4R') }
         else if (reds === 1) { boost -= 14; motivos.push('3/4G') }
-        const mgRec = placares.filter(Boolean).reduce((s, p) => s + p!.gols, 0) / Math.max(placares.filter(Boolean).length, 1)
-        if (mgRec > mediaG + 0.8) boost -= 8
-        if (mgRec < mediaG - 0.8) boost += 8
       }
     }
 
@@ -232,7 +226,6 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   return resultado
 }
 
-
 export default function GradeResultados({ linhas, colunas, horas, liga, ligas, onTrocarLiga, dadosTodasLigas }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
@@ -248,18 +241,17 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   })
 
   const horaBet365 = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
-
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
   const linhas20 = linhas.slice(0, 20)
 
-  const linhaStats = useMemo(() => linhas20.map((linha, idx) => {
+  const linhaStats = useMemo(() => linhas20.map((linha) => {
     let total = 0, greens = 0, totalGols = 0
     cols.forEach(col => {
       const p = extrairPlacar(linha[col] as string)
       if (p) { total++; totalGols += p.gols; if (p.over25) greens++ }
     })
-    return { idx, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
+    return { total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
   }), [linhas, colunas])
 
   const colStats = useMemo(() => cols.map(col => {
@@ -268,11 +260,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       const p = extrairPlacar(linha[col] as string)
       if (!p) return
       total++
-      if (!temFiltro) {
-        if (p.over25) greens++
-      } else {
-        if (passaFiltro(p, filtrosAtivos)) greens++
-      }
+      if (!temFiltro) { if (p.over25) greens++ }
+      else { if (passaFiltro(p, filtrosAtivos)) greens++ }
     })
     return { col, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0 }
   }), [linhas, colunas, filtrosAtivos])
@@ -296,7 +285,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         pctFora: Math.round(fora / total * 100),
         mediaGols: Math.round(gols / total * 10) / 10,
       }
-    }).filter(Boolean) as { min: string; total: number; pctOver: number; pctCasa: number; pctFora: number; mediaGols: number }[]
+    }).filter(Boolean) as any[]
     return {
       melhorCasa: [...porMinuto].sort((a, b) => b.pctCasa - a.pctCasa).slice(0, 5),
       melhorFora: [...porMinuto].sort((a, b) => b.pctFora - a.pctFora).slice(0, 5),
@@ -306,31 +295,25 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
 
   const cruzamentoLigas = useMemo(() => {
     if (!dadosTodasLigas || Object.keys(dadosTodasLigas).length === 0) return []
-    const resultado: { liga: string; minuto: string; sinal: string; pct: number }[] = []
-
+    const resultado: any[] = []
     Object.entries(dadosTodasLigas).forEach(([nomeLiga, linhasLiga]) => {
       if (linhasLiga.length < 5) return
       cols.forEach(col => {
         const histLigaAtual = linhas.slice(0, 8).map(l => extrairPlacar(l[col] as string)).filter(Boolean) as PlacarInfo[]
         const histOutraLiga = linhasLiga.slice(0, 8).map(l => extrairPlacar(l[col] as string)).filter(Boolean) as PlacarInfo[]
         if (histLigaAtual.length < 3 || histOutraLiga.length < 3) return
-
         const pctAtual = Math.round(histLigaAtual.filter(p => p.over25).length / histLigaAtual.length * 100)
         const pctOutra = Math.round(histOutraLiga.filter(p => p.over25).length / histOutraLiga.length * 100)
-
         if (Math.abs(pctAtual - pctOutra) >= 40) {
-          const min = col.replace('tempo', '')
-          const ligaEmGreen = pctAtual > pctOutra ? (liga || 'atual') : nomeLiga
           resultado.push({
-            liga: ligaEmGreen,
-            minuto: min,
+            liga: pctAtual > pctOutra ? (liga || 'atual') : nomeLiga,
+            minuto: col.replace('tempo', ''),
             sinal: pctAtual > pctOutra ? 'OVER 2.5' : 'UNDER 2.5',
             pct: Math.max(pctAtual, pctOutra),
           })
         }
       })
     })
-
     return resultado.sort((a, b) => b.pct - a.pct).slice(0, 5)
   }, [linhas, colunas, dadosTodasLigas])
 
@@ -338,14 +321,11 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     return cols.map(col => {
       const histCompleto = linhas.slice(0, 48).map(l => extrairPlacar(l[col] as string)).filter(Boolean) as PlacarInfo[]
       if (histCompleto.length < 10) return null
-
       const pctHist = Math.round(histCompleto.filter(p => p.over25).length / histCompleto.length * 100)
       const ultimas3 = histCompleto.slice(0, 3)
       const pctRecente = Math.round(ultimas3.filter(p => p.over25).length / ultimas3.length * 100)
-
       const desvio = Math.abs(pctRecente - pctHist)
       if (desvio < 40) return null
-
       const min = col.replace('tempo', '')
       return {
         minuto: min,
@@ -357,7 +337,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       }
     }).filter(Boolean).filter(a => a!.mercado !== null)
       .sort((a, b) => b!.desvio - a!.desvio)
-      .slice(0, 5) as { minuto: string; pctHistorico: number; pctRecente: number; desvio: number; mercado: string; forca: string }[]
+      .slice(0, 5) as any[]
   }, [linhas, colunas])
 
   const tendencias = useMemo(() => {
@@ -387,14 +367,9 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
 
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
+  function setFiltroAuto(novoFiltro: typeof FILTRO_VAZIO) { setFiltros(novoFiltro); setFiltrosAtivos(novoFiltro) }
 
-  function setFiltroAuto(novoFiltro: typeof FILTRO_VAZIO) {
-    setFiltros(novoFiltro)
-    setFiltrosAtivos(novoFiltro)
-  }
-
-  const horaBet = horaBet365
-  const horaAtualBet = horaBet
+  const horaAtualBet = horaBet365
   const minAtualBet = agora.getMinutes()
   const segAtualBet = agora.getSeconds()
 
@@ -424,316 +399,330 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
       const osc = ctx.createOscillator()
       const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
+      osc.connect(gain); gain.connect(ctx.destination)
       osc.frequency.value = 880
       gain.gain.setValueAtTime(0.3, ctx.currentTime)
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
-      osc.start(ctx.currentTime)
-      osc.stop(ctx.currentTime + 0.5)
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.5)
     } catch (e) {}
   }
 
-  const verde = '#1a7a3a', vermelho = '#c0392b', azul = '#1565c0'
-  const bg = '#ffffff', bgLight = '#f0f0f0', border = '#cccccc'
+  // ── PALETA TECH DARK ──────────────────────────────────────────────────
+  const C = {
+    bg:       '#0a0e1a',
+    surface:  '#0f1629',
+    surface2: '#141d35',
+    border:   '#1e2d4a',
+    accent:   '#00d4ff',
+    accentDim:'#0099bb',
+    green:    '#00e676',
+    greenDim: '#005a28',
+    red:      '#ff3d5a',
+    redDim:   '#5a0015',
+    yellow:   '#ffd600',
+    text:     '#e0eaff',
+    textDim:  '#5a7090',
+    textMid:  '#8aa0c0',
+  }
+
+  const pill = (bg: string, color: string, txt: string) => (
+    <span style={{ background: bg, color, borderRadius: '4px', padding: '1px 6px', fontSize: '9px', fontWeight: 700, letterSpacing: '1px' }}>{txt}</span>
+  )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
 
-      {/* STATS + LIGAS + IA */}
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+        .betgol-btn { transition: all 0.15s ease; }
+        .betgol-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+        .betgol-row:hover td { background: #1a2540 !important; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: ${C.bg}; }
+        ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+      `}</style>
+
+      {/* ── BARRA DE LIGAS + STATS ── */}
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 12px' }}>
         {[
-          { lbl: 'GREENS', val: stats20.pct + '%' },
-          { lbl: 'GOLS', val: String(stats20.mediaGols) },
-          { lbl: 'PARTIDAS', val: String(stats20.total) },
+          { lbl: 'GREENS', val: stats20.pct + '%', color: stats20.pct >= 50 ? C.green : C.red },
+          { lbl: 'GOLS/J', val: String(stats20.mediaGols), color: C.accent },
+          { lbl: 'JOGOS', val: String(stats20.total), color: C.textMid },
         ].map(s => (
-          <div key={s.lbl} style={{ background: azul, borderRadius: '6px', padding: '5px 10px' }}>
-            <div style={{ fontSize: '9px', color: '#aaccff' }}>{s.lbl}</div>
-            <div style={{ fontSize: '14px', fontWeight: 800, color: '#fff', fontFamily: 'monospace' }}>{s.val}</div>
+          <div key={s.lbl} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '4px 10px', marginRight: '4px' }}>
+            <div style={{ fontSize: '8px', color: C.textDim, letterSpacing: '1px' }}>{s.lbl}</div>
+            <div style={{ fontSize: '16px', fontWeight: 800, color: s.color }}>{s.val}</div>
           </div>
         ))}
+
+        <div style={{ width: '1px', height: '32px', background: C.border, margin: '0 4px' }} />
+
         {ligas && ligas.map(l => (
-          <button key={l} onClick={() => onTrocarLiga && onTrocarLiga(l)} style={{
-            padding: '5px 12px', border: 'none', borderRadius: '6px',
-            background: liga === l ? verde : azul,
-            color: '#fff', fontWeight: 700, fontSize: '11px', cursor: 'pointer',
+          <button key={l} className="betgol-btn" onClick={() => onTrocarLiga && onTrocarLiga(l)} style={{
+            padding: '5px 12px', border: `1px solid ${liga === l ? C.accent : C.border}`,
+            borderRadius: '6px', background: liga === l ? C.accent + '22' : 'transparent',
+            color: liga === l ? C.accent : C.textMid, fontWeight: 700, fontSize: '10px',
+            cursor: 'pointer', letterSpacing: '1px', fontFamily: 'inherit',
           }}>
-            {l.toUpperCase()}
+            {l.split(' ')[0].toUpperCase()}
           </button>
         ))}
+
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-          <button onClick={() => setMostrarIA(!mostrarIA)} style={{ padding: '5px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700, fontSize: '11px', background: mostrarIA ? verde : azul, color: '#fff' }}>
+          <button className="betgol-btn" onClick={() => setMostrarIA(!mostrarIA)} style={{
+            padding: '5px 10px', border: `1px solid ${mostrarIA ? C.green : C.border}`,
+            borderRadius: '6px', background: mostrarIA ? C.green + '22' : 'transparent',
+            color: mostrarIA ? C.green : C.textMid, fontWeight: 700, fontSize: '10px',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}>
             IA {mostrarIA ? 'ON' : 'OFF'}
           </button>
           {mostrarIA && ([1, 2, 3] as const).map(t => (
-            <button key={t} onClick={() => setTipoIA(t)} style={{ padding: '5px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700, fontSize: '11px', background: tipoIA === t ? verde : azul, color: '#fff' }}>
-              TIPO {t}
+            <button key={t} className="betgol-btn" onClick={() => setTipoIA(t)} style={{
+              padding: '5px 10px', border: `1px solid ${tipoIA === t ? C.accent : C.border}`,
+              borderRadius: '6px', background: tipoIA === t ? C.accent + '22' : 'transparent',
+              color: tipoIA === t ? C.accent : C.textMid, fontWeight: 700, fontSize: '10px',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              T{t}
             </button>
           ))}
         </div>
       </div>
 
-      {/* PAINEIS - MELHORES MINUTOS */}
-      <div style={{ background: azul, borderRadius: '8px', padding: '4px 8px' }}>
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+      {/* ── MELHORES MINUTOS ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 12px' }}>
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
           {([
-            { key: 'casa' as const, lbl: 'VITORIA CASA' },
-            { key: 'fora' as const, lbl: 'VITORIA FORA' },
-            { key: 'gols' as const, lbl: 'MAIS GOLS' },
+            { key: 'casa' as const, lbl: '⌂ CASA' },
+            { key: 'fora' as const, lbl: '✈ FORA' },
+            { key: 'gols' as const, lbl: '◎ GOLS' },
           ]).map(b => (
-            <button key={b.key} onClick={() => setPainelAtivo(b.key)} style={{
-              padding: '3px 10px', border: 'none', borderRadius: '4px',
-              cursor: 'pointer', fontWeight: 700, fontSize: '10px',
-              background: painelAtivo === b.key ? verde : '#2979ff',
-              color: '#fff',
+            <button key={b.key} className="betgol-btn" onClick={() => setPainelAtivo(b.key)} style={{
+              padding: '3px 10px', border: `1px solid ${painelAtivo === b.key ? C.accent : C.border}`,
+              borderRadius: '4px', background: painelAtivo === b.key ? C.accent + '22' : 'transparent',
+              color: painelAtivo === b.key ? C.accent : C.textMid,
+              fontWeight: 700, fontSize: '9px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '1px',
             }}>
               {b.lbl}
             </button>
           ))}
         </div>
-        <div style={{ background: '#fff', borderRadius: '6px', padding: '4px 8px' }}>
-          {painelAtivo === 'casa' && (
-            <div>
-              <div style={{ fontSize: '9px', fontWeight: 800, color: verde, marginBottom: '4px' }}>MELHORES MINUTOS - VITORIA CASA (ult. 20h)</div>
-              {melhoresParaApostar.melhorCasa.map((t, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
-                    <span style={{ color: '#999', fontSize: '10px' }}>{proximaHora(t.min)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <span style={{ color: '#666', fontSize: '10px' }}>{t.total}j</span>
-                    <span style={{ color: verde, fontWeight: 700 }}>{t.pctCasa}% casa vence</span>
-                  </div>
-                </div>
-              ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {painelAtivo === 'casa' && melhoresParaApostar.melhorCasa.map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: i === 0 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
+                <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+              </div>
+              <span style={{ color: C.green, fontWeight: 700 }}>{t.pctCasa}% casa</span>
             </div>
-          )}
-          {painelAtivo === 'fora' && (
-            <div>
-              <div style={{ fontSize: '9px', fontWeight: 800, color: vermelho, marginBottom: '4px' }}>MELHORES MINUTOS - VITORIA FORA (ult. 20h)</div>
-              {melhoresParaApostar.melhorFora.map((t, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
-                    <span style={{ color: '#999', fontSize: '10px' }}>{proximaHora(t.min)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <span style={{ color: '#666', fontSize: '10px' }}>{t.total}j</span>
-                    <span style={{ color: vermelho, fontWeight: 700 }}>{t.pctFora}% fora vence</span>
-                  </div>
-                </div>
-              ))}
+          ))}
+          {painelAtivo === 'fora' && melhoresParaApostar.melhorFora.map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: i === 0 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
+                <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+              </div>
+              <span style={{ color: C.red, fontWeight: 700 }}>{t.pctFora}% fora</span>
             </div>
-          )}
-          {painelAtivo === 'gols' && (
-            <div>
-              <div style={{ fontSize: '9px', fontWeight: 800, color: azul, marginBottom: '4px' }}>MINUTOS COM MAIS GOLS (ult. 20h)</div>
-              {melhoresParaApostar.maisGols.map((t, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee', fontSize: '11px' }}>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    <span style={{ color: i < 3 ? azul : '#111', fontWeight: i === 0 ? 700 : 500 }}>MIN {t.min}</span>
-                    <span style={{ color: '#999', fontSize: '10px' }}>{proximaHora(t.min)}</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <span style={{ color: '#666', fontSize: '10px' }}>{t.total}j</span>
-                    <span style={{ color: azul, fontWeight: 700 }}>{t.mediaGols} gols/j | {t.pctOver}% over2.5</span>
-                  </div>
-                </div>
-              ))}
+          ))}
+          {painelAtivo === 'gols' && melhoresParaApostar.maisGols.map((t: any, i: number) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: i === 0 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
+                <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+              </div>
+              <span style={{ color: C.accent, fontWeight: 700 }}>{t.mediaGols}g/j · {t.pctOver}% OV</span>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* ANOMALIAS */}
+      {/* ── ANOMALIAS ── */}
       {anomalias.length > 0 && (
-        <div style={{ background: '#fff3e0', border: '2px solid #ff9800', borderRadius: '8px', padding: '8px 12px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#e65100', marginBottom: '6px', letterSpacing: '1px' }}>
-            ANOMALIA DETECTADA - MERCADO FORA DO PADRAO
-          </div>
+        <div style={{ background: '#1a1000', border: `1px solid #ff9800`, borderRadius: '8px', padding: '8px 12px' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, color: '#ff9800', marginBottom: '6px', letterSpacing: '2px' }}>⚡ ANOMALIAS DETECTADAS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {anomalias.map((a, i) => (
-              <div key={i} style={{ background: '#fff', border: '1px solid #ff9800', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: azul }}>MIN {a.minuto}</span>
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: a.forca === 'FORTE' ? vermelho : '#e65100', background: a.forca === 'FORTE' ? '#fde8e8' : '#fff3e0', borderRadius: '3px', padding: '1px 5px' }}>{a.forca}</span>
+            {anomalias.map((a: any, i: number) => (
+              <div key={i} style={{ background: C.surface2, border: '1px solid #ff9800', borderRadius: '6px', padding: '5px 10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: C.accent }}>MIN {a.minuto}</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: a.forca === 'FORTE' ? C.red : '#ff9800' }}>{a.forca}</span>
                 </div>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: verde }}>{a.mercado}</div>
-                <div style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>
-                  Hist: {a.pctHistorico}% | Recente: {a.pctRecente}% | Desvio: {a.desvio}%
-                </div>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: C.green }}>{a.mercado}</div>
+                <div style={{ fontSize: '9px', color: C.textDim }}>H:{a.pctHistorico}% R:{a.pctRecente}%</div>
               </div>
             ))}
-          </div>
-          <div style={{ fontSize: '9px', color: '#e65100', marginTop: '6px' }}>
-            Minutos onde o resultado recente diverge fortemente do historico - correcao esperada
           </div>
         </div>
       )}
 
-      {/* CRUZAMENTO ENTRE LIGAS */}
+      {/* ── CRUZAMENTO LIGAS ── */}
       {cruzamentoLigas.length > 0 && (
-        <div style={{ background: '#f3e5f5', border: '2px solid #9c27b0', borderRadius: '8px', padding: '8px 12px' }}>
-          <div style={{ fontSize: '10px', fontWeight: 800, color: '#6a1b9a', marginBottom: '6px', letterSpacing: '1px' }}>
-            CRUZAMENTO DE LIGAS - CICLOS OPOSTOS DETECTADOS
-          </div>
+        <div style={{ background: '#0e0a1a', border: `1px solid #9c27b0`, borderRadius: '8px', padding: '8px 12px' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, color: '#ce93d8', marginBottom: '6px', letterSpacing: '2px' }}>🌐 CICLOS OPOSTOS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {cruzamentoLigas.map((c2, i) => (
-              <div key={i} style={{ background: '#fff', border: '1px solid #9c27b0', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#6a1b9a', marginBottom: '2px' }}>{c2.liga}</div>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: verde }}>{c2.sinal}</div>
-                <div style={{ fontSize: '9px', color: '#666' }}>MIN {c2.minuto} | {c2.pct}% recente</div>
+            {cruzamentoLigas.map((c2: any, i: number) => (
+              <div key={i} style={{ background: C.surface2, border: '1px solid #9c27b0', borderRadius: '6px', padding: '5px 10px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#ce93d8' }}>{c2.liga.split(' ')[0]}</div>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: C.green }}>{c2.sinal}</div>
+                <div style={{ fontSize: '9px', color: C.textDim }}>MIN {c2.minuto} · {c2.pct}%</div>
               </div>
             ))}
-          </div>
-          <div style={{ fontSize: '9px', color: '#6a1b9a', marginTop: '6px' }}>
-            Ligas em ciclos opostos - entrada na liga em GREEN quando a outra esta em RED
           </div>
         </div>
       )}
 
-      {/* FILTROS */}
-      <div style={{ background: '#ffd600', borderRadius: '8px', padding: '8px 12px' }}>
-        <div style={{ fontSize: '10px', color: '#333', fontWeight: 700, marginBottom: '8px' }}>FILTROS</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', marginBottom: '4px' }}>
+      {/* ── FILTROS ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 12px' }}>
+        <div style={{ fontSize: '9px', color: C.textDim, letterSpacing: '2px', marginBottom: '8px' }}>FILTROS</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
           {[
             { lbl: 'OVER', key: 'over' as const, opts: ['0.5','1.5','2.5','3.5'] },
             { lbl: 'UNDER', key: 'under' as const, opts: ['1.5','2.5','3.5'] },
           ].map(f => (
-            <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>{f.lbl}</span>
-              <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros[f.key]} onChange={e => setFiltroAuto({ ...filtros, [f.key]: e.target.value })}>
-                <option value="">-</option>
+            <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>{f.lbl}</span>
+              <select style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, color: C.text, padding: '4px 6px', fontSize: '11px', borderRadius: '4px', outline: 'none', fontFamily: 'inherit' }}
+                value={filtros[f.key]} onChange={e => setFiltroAuto({ ...filtros, [f.key]: e.target.value })}>
+                <option value="">—</option>
                 {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
           ))}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>AMBAS</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.ambas} onChange={e => setFiltroAuto({ ...filtros, ambas: e.target.value })}>
-              <option value="">-</option>
-              <option value="sim">Sim</option>
-              <option value="nao">Nao</option>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>AMBAS</span>
+            <select style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, color: C.text, padding: '4px 6px', fontSize: '11px', borderRadius: '4px', outline: 'none', fontFamily: 'inherit' }}
+              value={filtros.ambas} onChange={e => setFiltroAuto({ ...filtros, ambas: e.target.value })}>
+              <option value="">—</option>
+              <option value="sim">SIM</option>
+              <option value="nao">NÃO</option>
             </select>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '10px', color: '#111', fontWeight: 700, minWidth: '40px' }}>RESULT.</span>
-            <select style={{ flex: 1, background: '#fff', border: '1px solid #ccc', color: '#111', padding: '1px 3px', fontSize: '11px', borderRadius: '3px', outline: 'none', height: '22px' }} value={filtros.resultado} onChange={e => setFiltroAuto({ ...filtros, resultado: e.target.value })}>
-              <option value="">-</option>
-              <option value="casa">Casa</option>
-              <option value="empate">Empate</option>
-              <option value="fora">Fora</option>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>RESULT</span>
+            <select style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, color: C.text, padding: '4px 6px', fontSize: '11px', borderRadius: '4px', outline: 'none', fontFamily: 'inherit' }}
+              value={filtros.resultado} onChange={e => setFiltroAuto({ ...filtros, resultado: e.target.value })}>
+              <option value="">—</option>
+              <option value="casa">CASA</option>
+              <option value="empate">EMPATE</option>
+              <option value="fora">FORA</option>
             </select>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={aplicar} style={{ flex: 1, background: verde, color: '#fff', border: 'none', padding: '5px', fontWeight: 700, fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>FILTRAR</button>
-          <button onClick={limpar} style={{ flex: 1, background: '#fff', color: '#333', border: '1px solid #ccc', padding: '5px', fontSize: '13px', borderRadius: '4px', cursor: 'pointer' }}>LIMPAR</button>
+          <button className="betgol-btn" onClick={aplicar} style={{ flex: 1, background: C.green + '22', color: C.green, border: `1px solid ${C.green}`, padding: '6px', fontWeight: 700, fontSize: '11px', borderRadius: '4px', cursor: 'pointer', letterSpacing: '1px', fontFamily: 'inherit' }}>FILTRAR</button>
+          <button className="betgol-btn" onClick={limpar} style={{ flex: 1, background: 'transparent', color: C.textMid, border: `1px solid ${C.border}`, padding: '6px', fontSize: '11px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'inherit' }}>LIMPAR</button>
         </div>
       </div>
 
-      {/* MELHORES ENTRADAS */}
+      {/* ── MELHORES ENTRADAS ── */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: verde, borderRadius: '6px', padding: '8px 12px' }}>
+        <div style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '8px', padding: '8px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fff' }} />
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#fff' }}>MELHORES ENTRADAS - PROXIMA PARTIDA</span>
-            <span style={{ fontSize: '10px', color: '#ccffcc' }}>IA TIPO {tipoIA}</span>
-            {liga && <span style={{ fontSize: '10px', background: '#ffffff33', color: '#fff', borderRadius: '3px', padding: '1px 6px', fontWeight: 700 }}>{liga.toUpperCase()}</span>}
-            <button onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? '#fff' : '#ffffff44', color: alertaSom ? verde : '#fff', border: 'none', borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' }}>
-              {alertaSom ? 'SOM ON' : 'SOM OFF'}
+            <span style={{ fontSize: '9px', fontWeight: 700, color: C.green, letterSpacing: '2px' }}>▶ MELHORES ENTRADAS</span>
+            <span style={{ fontSize: '9px', color: C.textDim }}>IA T{tipoIA}</span>
+            {liga && <span style={{ fontSize: '9px', background: C.green + '22', color: C.green, borderRadius: '3px', padding: '1px 6px', border: `1px solid ${C.green}` }}>{liga.split(' ')[0].toUpperCase()}</span>}
+            <button className="betgol-btn" onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? C.green + '22' : 'transparent', color: alertaSom ? C.green : C.textDim, border: `1px solid ${alertaSom ? C.green : C.border}`, borderRadius: '4px', padding: '2px 8px', fontSize: '9px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {alertaSom ? '🔔' : '🔕'}
             </button>
           </div>
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: '#fff', border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px', flex: '1', minWidth: '90px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '9px', color: '#333' }}>MIN {t.minuto}</span>
-                  <span style={{ fontSize: '9px', color: azul, fontWeight: 700 }}>{proximaHora(t.minuto)}</span>
+              <div key={i} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 10px', minWidth: '90px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                  <span style={{ fontSize: '9px', color: C.textDim }}>MIN {t.minuto}</span>
+                  <span style={{ fontSize: '9px', color: C.accent }}>{proximaHora(t.minuto)}</span>
                 </div>
-                <div style={{ fontSize: '10px', fontWeight: 800, color: '#111' }}>{t.mercado}</div>
-                <div style={{ fontSize: '15px', fontWeight: 800, color: azul, fontFamily: 'monospace', lineHeight: '1.1' }}>{t.probabilidade}%</div>
-                <div style={{ fontSize: '9px', color: verde, fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: vermelho, fontFamily: 'monospace' }}>
-                  {countdown(t.minuto)}
-                </div>
+                <div style={{ fontSize: '9px', fontWeight: 700, color: C.text }}>{t.mercado}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: C.accent, lineHeight: '1.1' }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '9px', color: C.green }}>CONF {t.confianca}%</div>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: C.red, fontFamily: 'monospace' }}>{countdown(t.minuto)}</div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '9px', color: '#ccffcc', marginTop: '4px' }}>Aposte apenas quando prob &gt;= 65% E confianca &gt;= 70%</div>
+          <div style={{ fontSize: '9px', color: C.textDim, marginTop: '4px' }}>Entre apenas com prob ≥ 65% E confiança ≥ 70%</div>
         </div>
       )}
 
-      {/* GRADE */}
-      <div style={{ overflowX: 'auto', width: '100%' }}>
+      {/* ── GRADE PRINCIPAL ── */}
+      <div style={{ overflowX: 'auto', width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '11px', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ background: bg, border: '1px solid ' + border, padding: '3px 5px', color: verde, fontSize: '10px', position: 'sticky', left: 0, zIndex: 3, minWidth: '24px' }}>H</th>
+              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '4px 6px', color: C.accent, fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, minWidth: '28px' }}>H</th>
               {colStats.map(cs => (
-                <th key={cs.col} style={{ background: bg, border: '1px solid ' + border, padding: '2px 3px', textAlign: 'center', minWidth: '42px' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: cs.pct >= 50 ? verde : vermelho }}>{cs.pct}%</div>
-                  <div style={{ fontSize: '9px', color: '#666' }}>{cs.total}</div>
+                <th key={cs.col} style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '2px 3px', textAlign: 'center', minWidth: '40px' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: cs.pct >= 50 ? C.green : C.red }}>{cs.pct}%</div>
+                  <div style={{ fontSize: '8px', color: C.textDim }}>{cs.total}</div>
                 </th>
               ))}
-              <th style={{ background: bg, border: '1px solid ' + border, padding: '2px 3px', color: '#666', fontSize: '9px', minWidth: '42px', textAlign: 'center' }}>% | G</th>
+              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '2px 3px', color: C.textDim, fontSize: '9px', minWidth: '40px', textAlign: 'center' }}>% | G</th>
             </tr>
+
             {mostrarIA && (
               <tr>
-                <th style={{ background: azul, border: '1px solid ' + border, padding: '2px 4px', color: '#fff', fontSize: '9px', position: 'sticky', left: 0, zIndex: 3, height: '24px' }}>IA T{tipoIA}</th>
+                <th style={{ background: C.accentDim + '33', border: `1px solid ${C.border}`, padding: '2px 4px', color: C.accent, fontSize: '8px', position: 'sticky', left: 0, zIndex: 3, height: '22px' }}>IA T{tipoIA}</th>
                 {cols.map(col => {
                   const t = tendencias.find(t => t.minuto === col.replace('tempo', ''))
                   return (
-                    <td key={col} title={t?.motivo} style={{ background: azul, border: '1px solid ' + border, padding: '1px 2px', textAlign: 'center', height: '24px' }}>
+                    <td key={col} title={t?.motivo} style={{ background: C.accentDim + '22', border: `1px solid ${C.border}`, padding: '1px 2px', textAlign: 'center', height: '22px' }}>
                       {t && temFiltro ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 800, color: '#fff', lineHeight: '1.2' }}>{t.probabilidade}%</span>
-                          <span style={{ fontSize: '9px', color: '#aaffaa', lineHeight: '1.2' }}>{t.confianca}%</span>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: C.accent }}>{t.probabilidade}%</span>
+                          <span style={{ fontSize: '8px', color: C.green }}>{t.confianca}%</span>
                         </div>
                       ) : t ? (
-                        <span style={{ fontSize: '8px', color: '#fff', fontWeight: 600 }}>{t.mercado}</span>
-                      ) : <span style={{ color: '#ffffff44' }}>-</span>}
+                        <span style={{ fontSize: '8px', color: C.accent, fontWeight: 600 }}>{t.mercado}</span>
+                      ) : <span style={{ color: C.textDim + '44' }}>·</span>}
                     </td>
                   )
                 })}
-                <td style={{ background: azul, border: '1px solid ' + border, height: '24px' }} />
+                <td style={{ background: C.accentDim + '22', border: `1px solid ${C.border}` }} />
               </tr>
             )}
+
             <tr>
-              <th style={{ background: bgLight, border: '1px solid ' + border, padding: '3px 5px', color: '#666', fontSize: '9px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
+              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px 5px', color: C.textDim, fontSize: '8px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
               {cols.map(col => (
-                <th key={col} style={{ background: bgLight, border: '1px solid ' + border, padding: '3px 3px', color: '#666', fontSize: '9px', textAlign: 'center' }}>
+                <th key={col} style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: C.textDim, fontSize: '9px', textAlign: 'center' }}>
                   {col.replace('tempo', '')}
                 </th>
               ))}
-              <th style={{ background: bgLight, border: '1px solid ' + border, padding: '3px 3px', color: '#666', fontSize: '9px', textAlign: 'center', minWidth: '42px' }}>% | G</th>
+              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: C.textDim, fontSize: '9px', textAlign: 'center' }}>% | G</th>
             </tr>
           </thead>
           <tbody>
             {linhas20.map((linha, idx) => {
               const ls = linhaStats[idx]
               return (
-                <tr key={idx}>
-                  <td style={{ background: bgLight, border: '1px solid ' + border, padding: '0 4px', color: verde, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', fontFamily: 'monospace', height: '20px' }}>
+                <tr key={idx} className="betgol-row">
+                  <td style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '0 5px', color: C.accent, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', height: '20px' }}>
                     {horaLinha(idx)}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
+                    const bg = p
+                      ? (isGreen ? C.greenDim : (p.over25 ? '#1a0a0f' : '#0a1a0f'))
+                      : C.bg
+                    const color = p
+                      ? (isGreen ? C.green : (p.over25 ? C.red : C.green))
+                      : C.textDim
                     return (
-                      <td key={col} style={{ padding: '0', border: '1px solid ' + border, textAlign: 'center', height: '20px' }}>
+                      <td key={col} style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bg }}>
                         {p ? (
-                          <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', fontFamily: 'monospace', background: isGreen ? verde : vermelho, color: '#fff', textAlign: 'center' }}>
+                          <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color, textAlign: 'center' }}>
                             {p.texto}
                           </span>
-                        ) : <span style={{ color: '#ccc', fontSize: '9px' }}>-</span>}
+                        ) : <span style={{ color: C.textDim + '44', fontSize: '9px' }}>·</span>}
                       </td>
                     )
                   })}
-                  <td style={{ background: bgLight, border: '1px solid ' + border, padding: '0 4px', textAlign: 'center', height: '20px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: ls && ls.pct >= 50 ? verde : vermelho }}>{ls ? ls.pct : 0}%</span>
-                    <span style={{ fontSize: '9px', color: '#333', marginLeft: '2px' }}>{ls ? ls.totalGols : 0}g</span>
+                  <td style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '0 4px', textAlign: 'center', height: '20px' }}>
+                    <span style={{ fontSize: '9px', fontWeight: 700, color: ls && ls.pct >= 50 ? C.green : C.red }}>{ls ? ls.pct : 0}%</span>
+                    <span style={{ fontSize: '9px', color: C.textDim, marginLeft: '3px' }}>{ls ? ls.totalGols : 0}g</span>
                   </td>
                 </tr>
               )
@@ -742,17 +731,16 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </table>
       </div>
 
-      {/* LEGENDA IA */}
+      {/* ── LEGENDA IA ── */}
       {mostrarIA && (
-        <div style={{ background: bgLight, border: '1px solid ' + border, borderRadius: '6px', padding: '8px 14px', fontSize: '11px', color: '#333' }}>
-          <span style={{ color: azul, fontWeight: 700 }}>IA TIPO {tipoIA}: </span>
-          {tipoIA === 1 && 'Compara linha atual com a anterior (2 linhas)'}
-          {tipoIA === 2 && 'Compara atual + penultima + antepenultima (3 linhas)'}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 12px', fontSize: '10px', color: C.textMid }}>
+          <span style={{ color: C.accent, fontWeight: 700 }}>IA T{tipoIA} · </span>
+          {tipoIA === 1 && 'Compara linha atual com a anterior'}
+          {tipoIA === 2 && 'Compara 3 linhas consecutivas'}
           {tipoIA === 3 && 'Compara as 4 linhas mais recentes'}
-          {!temFiltro && <span style={{ marginLeft: '12px', color: '#b8600c' }}>Selecione um filtro para ver probabilidade por minuto</span>}
+          {!temFiltro && <span style={{ marginLeft: '12px', color: C.yellow + 'aa' }}>← selecione um filtro para ver probabilidade por minuto</span>}
         </div>
       )}
-
     </div>
   )
 }
