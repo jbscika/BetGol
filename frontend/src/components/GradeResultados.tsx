@@ -674,7 +674,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '9px', color: C.green + 'aa', marginTop: '4px' }}>Aposte apenas quando prob >= 65% E confianca >= 70%</div>
+          <div style={{ fontSize: '9px', color: C.green + 'aa', marginTop: '4px' }}>Aposte apenas quando prob &gt;= 65% E confianca &gt;= 70%</div>
         </div>
       )}
 
