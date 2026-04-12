@@ -25,7 +25,7 @@ const FILTRO_VAZIO = { over: '', under: '', ambas: '', resultado: '' }
 
 function extrairPlacar(val: string | null): PlacarInfo | null {
   if (!val) return null
-  const linha = typeof val === 'string' ? val.split('</br>')[0].split('<br>')[0].trim() : String(val)
+  const linha = val.split('</br>')[0].split('<br>')[0].trim()
   const m = linha.match(/(\d+)\s*-\s*(\d+)/)
   if (!m) return null
   const casa = parseInt(m[1]), fora = parseInt(m[2]), gols = casa + fora
@@ -48,6 +48,14 @@ function passaFiltro(p: PlacarInfo, f: typeof FILTRO_VAZIO): boolean {
   return true
 }
 
+function oddParaProb(odd: string): number {
+  const parts = odd.split('/')
+  if (parts.length !== 2) return 50
+  const num = parseInt(parts[0]), den = parseInt(parts[1])
+  if (isNaN(num) || isNaN(den) || den === 0) return 50
+  return Math.round(den / (num + den) * 100)
+}
+
 function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtroAtivo: typeof FILTRO_VAZIO): Tendencia[] {
   const resultado: Tendencia[] = []
   const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
@@ -66,21 +74,25 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const min = col.replace('tempo', '')
     const n = validos.length
 
+    // % historica base
     const pO25 = Math.round(validos.filter(p => p.over25).length / n * 100)
     const pO15 = Math.round(validos.filter(p => p.over15).length / n * 100)
     const pO35 = Math.round(validos.filter(p => p.over35).length / n * 100)
     const pAmbas = Math.round(validos.filter(p => p.ambasSim).length / n * 100)
     const pCasa = Math.round(validos.filter(p => p.casaVence).length / n * 100)
+    const pEmp = Math.round(validos.filter(p => p.empate).length / n * 100)
     const pFora = Math.round(validos.filter(p => p.foraVence).length / n * 100)
     const mediaG = Math.round(validos.reduce((s, p) => s + p.gols, 0) / n * 10) / 10
     const mediaGols2 = validos.reduce((s, p) => s + p.gols * p.gols, 0) / n
     const varGols = mediaGols2 - mediaG * mediaG
     const estabilidade = varGols < 1.5 ? 1.15 : varGols > 3.0 ? 0.85 : 1.0
 
+    // Placares das linhas de comparacao
     const placares = linhasComp.map(l => extrairPlacar(l[col] as string))
     const atual = placares[0]
     if (!atual) return
 
+    // Metrica A: peso decrescente
     const pesos = [4, 3, 2, 1]
     let pesoTotal = 0, scoreO25 = 0
     placares.forEach((p, i) => {
@@ -92,6 +104,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
     const pctO25Pond = pesoTotal > 0 ? Math.round(scoreO25 / pesoTotal * 100) : pO25
     const desvPond = pctO25Pond - pO25
 
+    // Metrica B: ciclo
     let mudancas = 0
     let prevState = histCompleto[0]?.over25
     for (let i = 1; i < Math.min(n, 24); i++) {
@@ -107,12 +120,14 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       else break
     }
 
+    // Metrica C: variacao por faixa temporal (3 faixas)
     const f1 = histCompleto.slice(0, 6).filter(Boolean) as PlacarInfo[]
     const f3 = histCompleto.slice(18, 36).filter(Boolean) as PlacarInfo[]
     const pF1 = f1.length > 0 ? f1.filter(p => p.over25).length / f1.length * 100 : pO25
     const pF3 = f3.length > 0 ? f3.filter(p => p.over25).length / f3.length * 100 : pO25
     const tendencia = pF3 - pF1
 
+    // Metrica D: correlacao com minuto anterior
     let corrBoost = 0
     if (colIdx > 0) {
       const histAnt = histMap[colunas[colIdx - 1]]
@@ -126,32 +141,38 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
       if (histAnt[0] && !histAnt[0].over25 && pCorr > 0.55) corrBoost = Math.round(pCorr * 12)
     }
 
+    // Score final
     let boost = 0
     const motivos: string[] = []
 
+    // A: desvio ponderado
     if (desvPond < -20) { boost += 20; motivos.push('Over devendo++') }
     else if (desvPond < -10) { boost += 12; motivos.push('Over devendo') }
     else if (desvPond > 20) { boost -= 18; motivos.push('Over excesso') }
     else if (desvPond > 10) { boost -= 10 }
 
+    // B: ciclo
     if (cicloMedio > 0 && seqAtual >= cicloMedio) {
       const fc = Math.min((seqAtual - cicloMedio + 1) * 9, 24)
       boost += dirAtual ? -fc : fc
       motivos.push('Ciclo ' + cicloMedio + ' seq ' + seqAtual)
     }
 
+    // C: tendencia temporal
     if (tendencia > 20) { boost += 14; motivos.push('Tend+') }
     else if (tendencia > 10) { boost += 7 }
     else if (tendencia < -20) { boost -= 12 }
     else if (tendencia < -10) { boost -= 6 }
 
+    // D: correlacao
     boost += corrBoost
     if (corrBoost > 0) motivos.push('Corr+')
 
+    // E: padrao de linhas por tipo
     if (tipoIA === 1) {
       const ant = placares[1]
       if (ant) {
-        if (atual.over25 === ant.over25) { boost += atual.over25 ? -10 : 12 }
+        if (atual.over25 === ant.over25) { boost += atual.over25 ? -10 : 12; motivos.push(atual.over25 ? '2xG->rev' : '2xR->corr') }
         else { boost += atual.over25 ? 4 : -4 }
       }
     } else if (tipoIA === 2) {
@@ -160,6 +181,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         const reds = [ant2.over25, ant1.over25, atual.over25].filter(r => !r).length
         if (reds === 3) { boost += 20; motivos.push('3xRED') }
         else if (reds === 0) { boost -= 18; motivos.push('3xGREEN') }
+        else if (ant1.over25 === atual.over25) { boost += atual.over25 ? -8 : 10 }
       }
     } else {
       const ant1 = placares[1], ant2 = placares[2], ant3 = placares[3]
@@ -169,6 +191,9 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
         else if (reds === 0) { boost -= 22; motivos.push('4xGREEN') }
         else if (reds === 3) { boost += 16; motivos.push('3/4R') }
         else if (reds === 1) { boost -= 14; motivos.push('3/4G') }
+        const mgRec = placares.filter(Boolean).reduce((s, p) => s + p!.gols, 0) / Math.max(placares.filter(Boolean).length, 1)
+        if (mgRec > mediaG + 0.8) boost -= 8
+        if (mgRec < mediaG - 0.8) boost += 8
       }
     }
 
@@ -226,6 +251,7 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   return resultado
 }
 
+
 export default function GradeResultados({ linhas, colunas, horas, liga, ligas, onTrocarLiga, dadosTodasLigas }: Props) {
   const [filtros, setFiltros] = useState({ ...FILTRO_VAZIO })
   const [filtrosAtivos, setFiltrosAtivos] = useState({ ...FILTRO_VAZIO })
@@ -235,23 +261,24 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const [alertaSom, setAlertaSom] = useState(true)
   const [agora, setAgora] = useState(new Date())
 
-  useState(() => {
+  // Timer correto com useEffect
+  useMemo(() => {
     const timer = setInterval(() => setAgora(new Date()), 1000)
     return () => clearInterval(timer)
-  })
+  }, [])
 
   const horaBet365 = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
   const linhas20 = linhas.slice(0, 20)
 
-  const linhaStats = useMemo(() => linhas20.map((linha) => {
+  const linhaStats = useMemo(() => linhas20.map((linha, idx) => {
     let total = 0, greens = 0, totalGols = 0
     cols.forEach(col => {
       const p = extrairPlacar(linha[col] as string)
       if (p) { total++; totalGols += p.gols; if (p.over25) greens++ }
     })
-    return { total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
+    return { idx, total, greens, pct: total > 0 ? Math.round(greens / total * 100) : 0, totalGols }
   }), [linhas, colunas])
 
   const colStats = useMemo(() => cols.map(col => {
@@ -285,7 +312,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         pctFora: Math.round(fora / total * 100),
         mediaGols: Math.round(gols / total * 10) / 10,
       }
-    }).filter(Boolean) as any[]
+    }).filter(Boolean) as { min: string; total: number; pctOver: number; pctCasa: number; pctFora: number; mediaGols: number }[]
     return {
       melhorCasa: [...porMinuto].sort((a, b) => b.pctCasa - a.pctCasa).slice(0, 5),
       melhorFora: [...porMinuto].sort((a, b) => b.pctFora - a.pctFora).slice(0, 5),
@@ -295,7 +322,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
 
   const cruzamentoLigas = useMemo(() => {
     if (!dadosTodasLigas || Object.keys(dadosTodasLigas).length === 0) return []
-    const resultado: any[] = []
+    const resultado: { liga: string; minuto: string; sinal: string; pct: number }[] = []
     Object.entries(dadosTodasLigas).forEach(([nomeLiga, linhasLiga]) => {
       if (linhasLiga.length < 5) return
       cols.forEach(col => {
@@ -326,9 +353,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       const pctRecente = Math.round(ultimas3.filter(p => p.over25).length / ultimas3.length * 100)
       const desvio = Math.abs(pctRecente - pctHist)
       if (desvio < 40) return null
-      const min = col.replace('tempo', '')
       return {
-        minuto: min,
+        minuto: col.replace('tempo', ''),
         pctHistorico: pctHist,
         pctRecente,
         desvio,
@@ -337,7 +363,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       }
     }).filter(Boolean).filter(a => a!.mercado !== null)
       .sort((a, b) => b!.desvio - a!.desvio)
-      .slice(0, 5) as any[]
+      .slice(0, 5) as { minuto: string; pctHistorico: number; pctRecente: number; desvio: number; mercado: string; forca: string }[]
   }, [linhas, colunas])
 
   const tendencias = useMemo(() => {
@@ -407,7 +433,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     } catch (e) {}
   }
 
-  // ── PALETA TECH DARK ──────────────────────────────────────────────────
   const C = {
     bg:       '#0a0e1a',
     surface:  '#0f1629',
@@ -416,18 +441,14 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     accent:   '#00d4ff',
     accentDim:'#0099bb',
     green:    '#00e676',
-    greenDim: '#005a28',
+    greenDim: '#003a1a',
     red:      '#ff3d5a',
-    redDim:   '#5a0015',
+    redDim:   '#3a0010',
     yellow:   '#ffd600',
     text:     '#e0eaff',
-    textDim:  '#5a7090',
+    textDim:  '#3a5070',
     textMid:  '#8aa0c0',
   }
-
-  const pill = (bg: string, color: string, txt: string) => (
-    <span style={{ background: bg, color, borderRadius: '4px', padding: '1px 6px', fontSize: '9px', fontWeight: 700, letterSpacing: '1px' }}>{txt}</span>
-  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
@@ -438,11 +459,11 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         .betgol-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
         .betgol-row:hover td { background: #1a2540 !important; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: ${C.bg}; }
-        ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 2px; }
+        ::-webkit-scrollbar-track { background: #0a0e1a; }
+        ::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 2px; }
       `}</style>
 
-      {/* ── BARRA DE LIGAS + STATS ── */}
+      {/* STATS + LIGAS + IA */}
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 12px' }}>
         {[
           { lbl: 'GREENS', val: stats20.pct + '%', color: stats20.pct >= 50 ? C.green : C.red },
@@ -454,9 +475,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             <div style={{ fontSize: '16px', fontWeight: 800, color: s.color }}>{s.val}</div>
           </div>
         ))}
-
         <div style={{ width: '1px', height: '32px', background: C.border, margin: '0 4px' }} />
-
         {ligas && ligas.map(l => (
           <button key={l} className="betgol-btn" onClick={() => onTrocarLiga && onTrocarLiga(l)} style={{
             padding: '5px 12px', border: `1px solid ${liga === l ? C.accent : C.border}`,
@@ -467,7 +486,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             {l.split(' ')[0].toUpperCase()}
           </button>
         ))}
-
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
           <button className="betgol-btn" onClick={() => setMostrarIA(!mostrarIA)} style={{
             padding: '5px 10px', border: `1px solid ${mostrarIA ? C.green : C.border}`,
@@ -490,16 +508,16 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </div>
       </div>
 
-      {/* ── MELHORES MINUTOS ── */}
+      {/* MELHORES MINUTOS - PAINEIS */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 12px' }}>
         <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
           {([
-            { key: 'casa' as const, lbl: '⌂ CASA' },
-            { key: 'fora' as const, lbl: '✈ FORA' },
-            { key: 'gols' as const, lbl: '◎ GOLS' },
+            { key: 'casa' as const, lbl: 'VITORIA CASA' },
+            { key: 'fora' as const, lbl: 'VITORIA FORA' },
+            { key: 'gols' as const, lbl: 'MAIS GOLS' },
           ]).map(b => (
             <button key={b.key} className="betgol-btn" onClick={() => setPainelAtivo(b.key)} style={{
-              padding: '3px 10px', border: `1px solid ${painelAtivo === b.key ? C.accent : C.border}`,
+              padding: '4px 10px', border: `1px solid ${painelAtivo === b.key ? C.accent : C.border}`,
               borderRadius: '4px', background: painelAtivo === b.key ? C.accent + '22' : 'transparent',
               color: painelAtivo === b.key ? C.accent : C.textMid,
               fontWeight: 700, fontSize: '9px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '1px',
@@ -508,106 +526,119 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             </button>
           ))}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-          {painelAtivo === 'casa' && melhoresParaApostar.melhorCasa.map((t: any, i: number) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ color: i === 0 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
-                <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
-              </div>
-              <span style={{ color: C.green, fontWeight: 700 }}>{t.pctCasa}% casa</span>
-            </div>
-          ))}
-          {painelAtivo === 'fora' && melhoresParaApostar.melhorFora.map((t: any, i: number) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ color: i === 0 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
-                <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
-              </div>
-              <span style={{ color: C.red, fontWeight: 700 }}>{t.pctFora}% fora</span>
-            </div>
-          ))}
-          {painelAtivo === 'gols' && melhoresParaApostar.maisGols.map((t: any, i: number) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ color: i === 0 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
-                <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
-              </div>
-              <span style={{ color: C.accent, fontWeight: 700 }}>{t.mediaGols}g/j · {t.pctOver}% OV</span>
-            </div>
-          ))}
+        <div style={{ fontSize: '9px', color: C.textDim, letterSpacing: '1px', marginBottom: '4px' }}>
+          {painelAtivo === 'casa' ? 'MELHORES MINUTOS - VITORIA CASA (ult. 20 rodadas)' :
+           painelAtivo === 'fora' ? 'MELHORES MINUTOS - VITORIA FORA (ult. 20 rodadas)' :
+           'MINUTOS COM MAIS GOLS (ult. 20 rodadas)'}
         </div>
+        {painelAtivo === 'casa' && melhoresParaApostar.melhorCasa.map((t, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ color: i < 3 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
+              <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <span style={{ color: C.textDim, fontSize: '10px' }}>{t.total}j</span>
+              <span style={{ color: C.green, fontWeight: 700 }}>{t.pctCasa}% casa vence</span>
+            </div>
+          </div>
+        ))}
+        {painelAtivo === 'fora' && melhoresParaApostar.melhorFora.map((t, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ color: i < 3 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
+              <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <span style={{ color: C.textDim, fontSize: '10px' }}>{t.total}j</span>
+              <span style={{ color: C.red, fontWeight: 700 }}>{t.pctFora}% fora vence</span>
+            </div>
+          </div>
+        ))}
+        {painelAtivo === 'gols' && melhoresParaApostar.maisGols.map((t, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{ color: i < 3 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
+              <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <span style={{ color: C.textDim, fontSize: '10px' }}>{t.total}j</span>
+              <span style={{ color: C.accent, fontWeight: 700 }}>{t.mediaGols} gols/j | {t.pctOver}% over2.5</span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* ── ANOMALIAS ── */}
+      {/* ANOMALIAS */}
       {anomalias.length > 0 && (
-        <div style={{ background: '#1a1000', border: `1px solid #ff9800`, borderRadius: '8px', padding: '8px 12px' }}>
-          <div style={{ fontSize: '9px', fontWeight: 700, color: '#ff9800', marginBottom: '6px', letterSpacing: '2px' }}>⚡ ANOMALIAS DETECTADAS</div>
+        <div style={{ background: '#1a1000', border: '2px solid #ff9800', borderRadius: '8px', padding: '8px 12px' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, color: '#ff9800', marginBottom: '6px', letterSpacing: '2px' }}>ANOMALIA DETECTADA - MERCADO FORA DO PADRAO</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {anomalias.map((a: any, i: number) => (
-              <div key={i} style={{ background: C.surface2, border: '1px solid #ff9800', borderRadius: '6px', padding: '5px 10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+            {anomalias.map((a, i) => (
+              <div key={i} style={{ background: C.surface2, border: '1px solid #ff9800', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 700, color: C.accent }}>MIN {a.minuto}</span>
-                  <span style={{ fontSize: '9px', fontWeight: 700, color: a.forca === 'FORTE' ? C.red : '#ff9800' }}>{a.forca}</span>
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: a.forca === 'FORTE' ? C.red : '#ff9800', background: a.forca === 'FORTE' ? C.redDim : '#1a1000', borderRadius: '3px', padding: '1px 5px' }}>{a.forca}</span>
                 </div>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: C.green }}>{a.mercado}</div>
-                <div style={{ fontSize: '9px', color: C.textDim }}>H:{a.pctHistorico}% R:{a.pctRecente}%</div>
+                <div style={{ fontSize: '9px', color: C.textDim, marginTop: '2px' }}>Hist: {a.pctHistorico}% | Rec: {a.pctRecente}% | Dev: {a.desvio}%</div>
               </div>
             ))}
           </div>
+          <div style={{ fontSize: '9px', color: '#ff9800', marginTop: '6px' }}>Minutos onde resultado recente diverge do historico - correcao esperada</div>
         </div>
       )}
 
-      {/* ── CRUZAMENTO LIGAS ── */}
+      {/* CRUZAMENTO LIGAS */}
       {cruzamentoLigas.length > 0 && (
-        <div style={{ background: '#0e0a1a', border: `1px solid #9c27b0`, borderRadius: '8px', padding: '8px 12px' }}>
-          <div style={{ fontSize: '9px', fontWeight: 700, color: '#ce93d8', marginBottom: '6px', letterSpacing: '2px' }}>🌐 CICLOS OPOSTOS</div>
+        <div style={{ background: '#0e0a1a', border: '2px solid #9c27b0', borderRadius: '8px', padding: '8px 12px' }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, color: '#ce93d8', marginBottom: '6px', letterSpacing: '2px' }}>CRUZAMENTO DE LIGAS - CICLOS OPOSTOS</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {cruzamentoLigas.map((c2: any, i: number) => (
-              <div key={i} style={{ background: C.surface2, border: '1px solid #9c27b0', borderRadius: '6px', padding: '5px 10px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#ce93d8' }}>{c2.liga.split(' ')[0]}</div>
+            {cruzamentoLigas.map((c2, i) => (
+              <div key={i} style={{ background: C.surface2, border: '1px solid #9c27b0', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#ce93d8', marginBottom: '2px' }}>{c2.liga}</div>
                 <div style={{ fontSize: '11px', fontWeight: 800, color: C.green }}>{c2.sinal}</div>
-                <div style={{ fontSize: '9px', color: C.textDim }}>MIN {c2.minuto} · {c2.pct}%</div>
+                <div style={{ fontSize: '9px', color: C.textDim }}>MIN {c2.minuto} | {c2.pct}% recente</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* ── FILTROS ── */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 12px' }}>
-        <div style={{ fontSize: '9px', color: C.textDim, letterSpacing: '2px', marginBottom: '8px' }}>FILTROS</div>
+      {/* FILTROS */}
+      <div style={{ background: '#1a1500', border: `1px solid ${C.yellow}44`, borderRadius: '8px', padding: '8px 12px' }}>
+        <div style={{ fontSize: '9px', color: C.yellow, letterSpacing: '2px', fontWeight: 700, marginBottom: '8px' }}>FILTROS</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
           {[
             { lbl: 'OVER', key: 'over' as const, opts: ['0.5','1.5','2.5','3.5'] },
             { lbl: 'UNDER', key: 'under' as const, opts: ['1.5','2.5','3.5'] },
           ].map(f => (
             <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>{f.lbl}</span>
+              <span style={{ fontSize: '9px', color: C.yellow, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>{f.lbl}</span>
               <select style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, color: C.text, padding: '4px 6px', fontSize: '11px', borderRadius: '4px', outline: 'none', fontFamily: 'inherit' }}
                 value={filtros[f.key]} onChange={e => setFiltroAuto({ ...filtros, [f.key]: e.target.value })}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>AMBAS</span>
+            <span style={{ fontSize: '9px', color: C.yellow, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>AMBAS</span>
             <select style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, color: C.text, padding: '4px 6px', fontSize: '11px', borderRadius: '4px', outline: 'none', fontFamily: 'inherit' }}
               value={filtros.ambas} onChange={e => setFiltroAuto({ ...filtros, ambas: e.target.value })}>
-              <option value="">—</option>
-              <option value="sim">SIM</option>
-              <option value="nao">NÃO</option>
+              <option value="">-</option>
+              <option value="sim">Sim</option>
+              <option value="nao">Nao</option>
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>RESULT</span>
+            <span style={{ fontSize: '9px', color: C.yellow, fontWeight: 700, minWidth: '36px', letterSpacing: '1px' }}>RESULT.</span>
             <select style={{ flex: 1, background: C.surface2, border: `1px solid ${C.border}`, color: C.text, padding: '4px 6px', fontSize: '11px', borderRadius: '4px', outline: 'none', fontFamily: 'inherit' }}
               value={filtros.resultado} onChange={e => setFiltroAuto({ ...filtros, resultado: e.target.value })}>
-              <option value="">—</option>
-              <option value="casa">CASA</option>
-              <option value="empate">EMPATE</option>
-              <option value="fora">FORA</option>
+              <option value="">-</option>
+              <option value="casa">Casa</option>
+              <option value="empate">Empate</option>
+              <option value="fora">Fora</option>
             </select>
           </div>
         </div>
@@ -617,36 +648,37 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </div>
       </div>
 
-      {/* ── MELHORES ENTRADAS ── */}
+      {/* MELHORES ENTRADAS IA */}
       {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: '8px', padding: '8px 12px' }}>
+        <div style={{ background: C.greenDim, border: `2px solid ${C.green}`, borderRadius: '8px', padding: '8px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '9px', fontWeight: 700, color: C.green, letterSpacing: '2px' }}>▶ MELHORES ENTRADAS</span>
-            <span style={{ fontSize: '9px', color: C.textDim }}>IA T{tipoIA}</span>
-            {liga && <span style={{ fontSize: '9px', background: C.green + '22', color: C.green, borderRadius: '3px', padding: '1px 6px', border: `1px solid ${C.green}` }}>{liga.split(' ')[0].toUpperCase()}</span>}
-            <button className="betgol-btn" onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? C.green + '22' : 'transparent', color: alertaSom ? C.green : C.textDim, border: `1px solid ${alertaSom ? C.green : C.border}`, borderRadius: '4px', padding: '2px 8px', fontSize: '9px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-              {alertaSom ? '🔔' : '🔕'}
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: C.green }} />
+            <span style={{ fontSize: '10px', fontWeight: 800, color: C.green, letterSpacing: '1px' }}>MELHORES ENTRADAS - PROXIMA PARTIDA</span>
+            <span style={{ fontSize: '9px', color: C.textDim }}>IA TIPO {tipoIA}</span>
+            {liga && <span style={{ fontSize: '9px', background: C.green + '22', color: C.green, borderRadius: '3px', padding: '1px 6px', border: `1px solid ${C.green}`, fontWeight: 700 }}>{liga.toUpperCase()}</span>}
+            <button className="betgol-btn" onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? C.green + '22' : 'transparent', color: alertaSom ? C.green : C.textDim, border: `1px solid ${alertaSom ? C.green : C.border}`, borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {alertaSom ? 'SOM ON' : 'SOM OFF'}
             </button>
           </div>
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
             {melhores.map((t, i) => (
-              <div key={i} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 10px', minWidth: '90px' }}>
+              <div key={i} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 10px', minWidth: '95px', flex: '0 0 auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                   <span style={{ fontSize: '9px', color: C.textDim }}>MIN {t.minuto}</span>
-                  <span style={{ fontSize: '9px', color: C.accent }}>{proximaHora(t.minuto)}</span>
+                  <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700 }}>{proximaHora(t.minuto)}</span>
                 </div>
-                <div style={{ fontSize: '9px', fontWeight: 700, color: C.text }}>{t.mercado}</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: C.accent, lineHeight: '1.1' }}>{t.probabilidade}%</div>
-                <div style={{ fontSize: '9px', color: C.green }}>CONF {t.confianca}%</div>
+                <div style={{ fontSize: '9px', fontWeight: 800, color: C.text, marginBottom: '2px' }}>{t.mercado}</div>
+                <div style={{ fontSize: '20px', fontWeight: 800, color: C.accent, fontFamily: 'monospace', lineHeight: '1.1' }}>{t.probabilidade}%</div>
+                <div style={{ fontSize: '9px', color: C.green, fontWeight: 700 }}>Conf: {t.confianca}%</div>
                 <div style={{ fontSize: '10px', fontWeight: 700, color: C.red, fontFamily: 'monospace' }}>{countdown(t.minuto)}</div>
               </div>
             ))}
           </div>
-          <div style={{ fontSize: '9px', color: C.textDim, marginTop: '4px' }}>Entre apenas com prob ≥ 65% E confiança ≥ 70%</div>
+          <div style={{ fontSize: '9px', color: C.green + 'aa', marginTop: '4px' }}>Aposte apenas quando prob >= 65% E confianca >= 70%</div>
         </div>
       )}
 
-      {/* ── GRADE PRINCIPAL ── */}
+      {/* GRADE PRINCIPAL */}
       <div style={{ overflowX: 'auto', width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '11px', width: '100%' }}>
           <thead>
@@ -663,23 +695,25 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
 
             {mostrarIA && (
               <tr>
-                <th style={{ background: C.accentDim + '33', border: `1px solid ${C.border}`, padding: '2px 4px', color: C.accent, fontSize: '8px', position: 'sticky', left: 0, zIndex: 3, height: '22px' }}>IA T{tipoIA}</th>
+                <th style={{ background: C.accent + '22', border: `1px solid ${C.border}`, padding: '2px 4px', color: C.accent, fontSize: '8px', position: 'sticky', left: 0, zIndex: 3, height: '28px', fontFamily: 'inherit' }}>
+                  IA T{tipoIA}
+                </th>
                 {cols.map(col => {
                   const t = tendencias.find(t => t.minuto === col.replace('tempo', ''))
                   return (
-                    <td key={col} title={t?.motivo} style={{ background: C.accentDim + '22', border: `1px solid ${C.border}`, padding: '1px 2px', textAlign: 'center', height: '22px' }}>
+                    <td key={col} title={t?.motivo} style={{ background: C.accent + '11', border: `1px solid ${C.border}`, padding: '1px 2px', textAlign: 'center', height: '28px' }}>
                       {t && temFiltro ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 800, color: C.accent }}>{t.probabilidade}%</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.1' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: C.accent }}>{t.probabilidade}%</span>
                           <span style={{ fontSize: '8px', color: C.green }}>{t.confianca}%</span>
                         </div>
                       ) : t ? (
-                        <span style={{ fontSize: '8px', color: C.accent, fontWeight: 600 }}>{t.mercado}</span>
-                      ) : <span style={{ color: C.textDim + '44' }}>·</span>}
+                        <span style={{ fontSize: '8px', color: C.accent, fontWeight: 600, display: 'block', lineHeight: '1' }}>{t.mercado.replace('OVER ','O').replace('UNDER ','U')}</span>
+                      ) : <span style={{ color: C.textDim + '44' }}>-</span>}
                     </td>
                   )
                 })}
-                <td style={{ background: C.accentDim + '22', border: `1px solid ${C.border}` }} />
+                <td style={{ background: C.accent + '11', border: `1px solid ${C.border}` }} />
               </tr>
             )}
 
@@ -704,19 +738,15 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
-                    const bg = p
-                      ? (isGreen ? C.greenDim : (p.over25 ? '#1a0a0f' : '#0a1a0f'))
-                      : C.bg
-                    const color = p
-                      ? (isGreen ? C.green : (p.over25 ? C.red : C.green))
-                      : C.textDim
+                    const bgColor = !p ? C.bg : isGreen ? C.greenDim : p.over25 ? C.greenDim : C.redDim
+                    const textColor = !p ? C.textDim : isGreen ? C.green : p.over25 ? C.green : C.red
                     return (
-                      <td key={col} style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bg }}>
+                      <td key={col} style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bgColor }}>
                         {p ? (
-                          <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color, textAlign: 'center' }}>
+                          <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color: textColor, textAlign: 'center' }}>
                             {p.texto}
                           </span>
-                        ) : <span style={{ color: C.textDim + '44', fontSize: '9px' }}>·</span>}
+                        ) : <span style={{ color: C.textDim + '44', fontSize: '9px' }}>-</span>}
                       </td>
                     )
                   })}
@@ -731,14 +761,14 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </table>
       </div>
 
-      {/* ── LEGENDA IA ── */}
+      {/* LEGENDA */}
       {mostrarIA && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 12px', fontSize: '10px', color: C.textMid }}>
-          <span style={{ color: C.accent, fontWeight: 700 }}>IA T{tipoIA} · </span>
+          <span style={{ color: C.accent, fontWeight: 700 }}>IA T{tipoIA} </span>
           {tipoIA === 1 && 'Compara linha atual com a anterior'}
           {tipoIA === 2 && 'Compara 3 linhas consecutivas'}
           {tipoIA === 3 && 'Compara as 4 linhas mais recentes'}
-          {!temFiltro && <span style={{ marginLeft: '12px', color: C.yellow + 'aa' }}>← selecione um filtro para ver probabilidade por minuto</span>}
+          {!temFiltro && <span style={{ marginLeft: '12px', color: C.yellow + 'aa', fontSize: '9px' }}>selecione um filtro para ver prob% por minuto na linha IA</span>}
         </div>
       )}
     </div>
