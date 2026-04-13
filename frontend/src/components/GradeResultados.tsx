@@ -270,7 +270,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const horaBet365 = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
   const cols = colunas.length > 0 ? colunas : ['tempo01','tempo04','tempo07','tempo10','tempo13','tempo16','tempo19','tempo22','tempo25','tempo28','tempo31','tempo34','tempo37','tempo40','tempo43','tempo46','tempo49','tempo52','tempo55','tempo58']
-  const linhas20 = linhas.slice(0, 20)
+  // Filtrar so linhas com dados e limitar a 20
+  const linhas20 = linhas.filter(l => cols.some(c => l[c])).slice(0, 20)
 
   const linhaStats = useMemo(() => linhas20.map((linha, idx) => {
     let total = 0, greens = 0, totalGols = 0
@@ -732,18 +733,17 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
               const ls = linhaStats[idx]
               return (
                 <tr key={idx} className="betgol-row">
-                  <td style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '0 5px', color: C.accent, fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', height: '20px' }}>
+                  <td style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '0 5px', color: '#ffffff', fontWeight: 700, fontSize: '11px', position: 'sticky', left: 0, textAlign: 'center', height: '20px' }}>
                     {horaLinha(idx)}
                   </td>
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
-                    const bgColor = !p ? C.bg : isGreen ? C.greenDim : p.over25 ? C.greenDim : C.redDim
-                    const textColor = !p ? C.textDim : isGreen ? C.green : p.over25 ? C.green : C.red
+                    const bgColor = !p ? C.bg : isGreen ? '#006400' : p.over25 ? '#004d1a' : '#6b0000'
                     return (
                       <td key={col} style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bgColor }}>
                         {p ? (
-                          <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color: textColor, textAlign: 'center' }}>
+                          <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color: '#ffffff', textAlign: 'center' }}>
                             {p.texto}
                           </span>
                         ) : <span style={{ color: C.textDim + '44', fontSize: '9px' }}>-</span>}
