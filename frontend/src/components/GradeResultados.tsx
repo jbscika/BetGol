@@ -469,10 +469,10 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         {[
           { lbl: 'GREENS', val: stats20.pct + '%', color: stats20.pct >= 50 ? C.green : C.red },
           { lbl: 'GOLS/J', val: String(stats20.mediaGols), color: C.accent },
-          { lbl: 'JOGOS', val: String(stats20.total), color: C.textMid },
+          { lbl: 'JOGOS', val: String(stats20.total), color: '#ffffff' },
         ].map(s => (
           <div key={s.lbl} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '4px 10px', marginRight: '4px' }}>
-            <div style={{ fontSize: '8px', color: C.textDim, letterSpacing: '1px' }}>{s.lbl}</div>
+            <div style={{ fontSize: '8px', color: '#ffffff', letterSpacing: '1px' }}>{s.lbl}</div>
             <div style={{ fontSize: '16px', fontWeight: 800, color: s.color }}>{s.val}</div>
           </div>
         ))}
@@ -481,7 +481,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           <button key={l} className="betgol-btn" onClick={() => onTrocarLiga && onTrocarLiga(l)} style={{
             padding: '5px 12px', border: `1px solid ${liga === l ? C.accent : C.border}`,
             borderRadius: '6px', background: liga === l ? C.accent + '22' : 'transparent',
-            color: liga === l ? C.accent : C.textMid, fontWeight: 700, fontSize: '10px',
+            color: liga === l ? C.accent : '#ffffff', fontWeight: 700, fontSize: '10px',
             cursor: 'pointer', letterSpacing: '1px', fontFamily: 'inherit',
           }}>
             {l.split(' ')[0].toUpperCase()}
@@ -491,7 +491,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           <button className="betgol-btn" onClick={() => setMostrarIA(!mostrarIA)} style={{
             padding: '5px 10px', border: `1px solid ${mostrarIA ? C.green : C.border}`,
             borderRadius: '6px', background: mostrarIA ? C.green + '22' : 'transparent',
-            color: mostrarIA ? C.green : C.textMid, fontWeight: 700, fontSize: '10px',
+            color: mostrarIA ? C.green : '#ffffff', fontWeight: 700, fontSize: '10px',
             cursor: 'pointer', fontFamily: 'inherit',
           }}>
             IA {mostrarIA ? 'ON' : 'OFF'}
@@ -500,7 +500,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             <button key={t} className="betgol-btn" onClick={() => setTipoIA(t)} style={{
               padding: '5px 10px', border: `1px solid ${tipoIA === t ? C.accent : C.border}`,
               borderRadius: '6px', background: tipoIA === t ? C.accent + '22' : 'transparent',
-              color: tipoIA === t ? C.accent : C.textMid, fontWeight: 700, fontSize: '10px',
+              color: tipoIA === t ? C.accent : '#ffffff', fontWeight: 700, fontSize: '10px',
               cursor: 'pointer', fontFamily: 'inherit',
             }}>
               T{t}
@@ -520,14 +520,14 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             <button key={b.key} className="betgol-btn" onClick={() => setPainelAtivo(b.key)} style={{
               padding: '4px 10px', border: `1px solid ${painelAtivo === b.key ? C.accent : C.border}`,
               borderRadius: '4px', background: painelAtivo === b.key ? C.accent + '22' : 'transparent',
-              color: painelAtivo === b.key ? C.accent : C.textMid,
+              color: painelAtivo === b.key ? C.accent : '#ffffff',
               fontWeight: 700, fontSize: '9px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '1px',
             }}>
               {b.lbl}
             </button>
           ))}
         </div>
-        <div style={{ fontSize: '9px', color: C.textDim, letterSpacing: '1px', marginBottom: '4px' }}>
+        <div style={{ fontSize: '9px', color: '#ffffff', letterSpacing: '1px', marginBottom: '4px' }}>
           {painelAtivo === 'casa' ? 'MELHORES MINUTOS - VITORIA CASA (ult. 20 rodadas)' :
            painelAtivo === 'fora' ? 'MELHORES MINUTOS - VITORIA FORA (ult. 20 rodadas)' :
            'MINUTOS COM MAIS GOLS (ult. 20 rodadas)'}
@@ -535,11 +535,11 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         {painelAtivo === 'casa' && melhoresParaApostar.melhorCasa.map((t, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ color: i < 3 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
-              <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+              <span style={{ color: i < 3 ? C.accent : '#ffffff', fontWeight: 700 }}>MIN {t.min}</span>
+              <span style={{ color: '#ffffff', fontSize: '10px' }}>{proximaHora(t.min)}</span>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <span style={{ color: C.textDim, fontSize: '10px' }}>{t.total}j</span>
+              <span style={{ color: '#ffffff', fontSize: '10px' }}>{t.total}j</span>
               <span style={{ color: C.green, fontWeight: 700 }}>{t.pctCasa}% casa vence</span>
             </div>
           </div>
@@ -547,11 +547,11 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         {painelAtivo === 'fora' && melhoresParaApostar.melhorFora.map((t, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ color: i < 3 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
-              <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+              <span style={{ color: i < 3 ? C.accent : '#ffffff', fontWeight: 700 }}>MIN {t.min}</span>
+              <span style={{ color: '#ffffff', fontSize: '10px' }}>{proximaHora(t.min)}</span>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <span style={{ color: C.textDim, fontSize: '10px' }}>{t.total}j</span>
+              <span style={{ color: '#ffffff', fontSize: '10px' }}>{t.total}j</span>
               <span style={{ color: C.red, fontWeight: 700 }}>{t.pctFora}% fora vence</span>
             </div>
           </div>
@@ -559,11 +559,11 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         {painelAtivo === 'gols' && melhoresParaApostar.maisGols.map((t, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ color: i < 3 ? C.accent : C.textMid, fontWeight: 700 }}>MIN {t.min}</span>
-              <span style={{ color: C.textDim, fontSize: '10px' }}>{proximaHora(t.min)}</span>
+              <span style={{ color: i < 3 ? C.accent : '#ffffff', fontWeight: 700 }}>MIN {t.min}</span>
+              <span style={{ color: '#ffffff', fontSize: '10px' }}>{proximaHora(t.min)}</span>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <span style={{ color: C.textDim, fontSize: '10px' }}>{t.total}j</span>
+              <span style={{ color: '#ffffff', fontSize: '10px' }}>{t.total}j</span>
               <span style={{ color: C.accent, fontWeight: 700 }}>{t.mediaGols} gols/j | {t.pctOver}% over2.5</span>
             </div>
           </div>
@@ -582,7 +582,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                   <span style={{ fontSize: '9px', fontWeight: 700, color: a.forca === 'FORTE' ? C.red : '#ff9800', background: a.forca === 'FORTE' ? C.redDim : '#1a1000', borderRadius: '3px', padding: '1px 5px' }}>{a.forca}</span>
                 </div>
                 <div style={{ fontSize: '10px', fontWeight: 800, color: C.green }}>{a.mercado}</div>
-                <div style={{ fontSize: '9px', color: C.textDim, marginTop: '2px' }}>Hist: {a.pctHistorico}% | Rec: {a.pctRecente}% | Dev: {a.desvio}%</div>
+                <div style={{ fontSize: '9px', color: '#ffffff', marginTop: '2px' }}>Hist: {a.pctHistorico}% | Rec: {a.pctRecente}% | Dev: {a.desvio}%</div>
               </div>
             ))}
           </div>
@@ -599,7 +599,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
               <div key={i} style={{ background: C.surface2, border: '1px solid #9c27b0', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
                 <div style={{ fontSize: '10px', fontWeight: 700, color: '#ce93d8', marginBottom: '2px' }}>{c2.liga}</div>
                 <div style={{ fontSize: '11px', fontWeight: 800, color: C.green }}>{c2.sinal}</div>
-                <div style={{ fontSize: '9px', color: C.textDim }}>MIN {c2.minuto} | {c2.pct}% recente</div>
+                <div style={{ fontSize: '9px', color: '#ffffff' }}>MIN {c2.minuto} | {c2.pct}% recente</div>
               </div>
             ))}
           </div>
@@ -645,7 +645,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="betgol-btn" onClick={aplicar} style={{ flex: 1, background: C.green + '22', color: C.green, border: `1px solid ${C.green}`, padding: '6px', fontWeight: 700, fontSize: '11px', borderRadius: '4px', cursor: 'pointer', letterSpacing: '1px', fontFamily: 'inherit' }}>FILTRAR</button>
-          <button className="betgol-btn" onClick={limpar} style={{ flex: 1, background: 'transparent', color: C.textMid, border: `1px solid ${C.border}`, padding: '6px', fontSize: '11px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'inherit' }}>LIMPAR</button>
+          <button className="betgol-btn" onClick={limpar} style={{ flex: 1, background: 'transparent', color: '#ffffff', border: `1px solid ${C.border}`, padding: '6px', fontSize: '11px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'inherit' }}>LIMPAR</button>
         </div>
       </div>
 
@@ -655,9 +655,9 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: C.green }} />
             <span style={{ fontSize: '10px', fontWeight: 800, color: C.green, letterSpacing: '1px' }}>MELHORES ENTRADAS - PROXIMA PARTIDA</span>
-            <span style={{ fontSize: '9px', color: C.textDim }}>IA TIPO {tipoIA}</span>
+            <span style={{ fontSize: '9px', color: '#ffffff' }}>IA TIPO {tipoIA}</span>
             {liga && <span style={{ fontSize: '9px', background: C.green + '22', color: C.green, borderRadius: '3px', padding: '1px 6px', border: `1px solid ${C.green}`, fontWeight: 700 }}>{liga.toUpperCase()}</span>}
-            <button className="betgol-btn" onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? C.green + '22' : 'transparent', color: alertaSom ? C.green : C.textDim, border: `1px solid ${alertaSom ? C.green : C.border}`, borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button className="betgol-btn" onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? C.green + '22' : 'transparent', color: alertaSom ? C.green : '#ffffff', border: `1px solid ${alertaSom ? C.green : C.border}`, borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               {alertaSom ? 'SOM ON' : 'SOM OFF'}
             </button>
           </div>
@@ -665,7 +665,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             {melhores.map((t, i) => (
               <div key={i} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 10px', minWidth: '95px', flex: '0 0 auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '9px', color: C.textDim }}>MIN {t.minuto}</span>
+                  <span style={{ fontSize: '9px', color: '#ffffff' }}>MIN {t.minuto}</span>
                   <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700 }}>{proximaHora(t.minuto)}</span>
                 </div>
                 <div style={{ fontSize: '9px', fontWeight: 800, color: C.text, marginBottom: '2px' }}>{t.mercado}</div>
@@ -688,10 +688,10 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
               {colStats.map(cs => (
                 <th key={cs.col} style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '2px 3px', textAlign: 'center', minWidth: '40px' }}>
                   <div style={{ fontSize: '9px', fontWeight: 700, color: cs.pct >= 50 ? C.green : C.red }}>{cs.pct}%</div>
-                  <div style={{ fontSize: '8px', color: C.textDim }}>{cs.total}</div>
+                  <div style={{ fontSize: '8px', color: '#ffffff' }}>{cs.total}</div>
                 </th>
               ))}
-              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '2px 3px', color: C.textDim, fontSize: '9px', minWidth: '40px', textAlign: 'center' }}>% | G</th>
+              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '2px 3px', color: '#ffffff', fontSize: '9px', minWidth: '40px', textAlign: 'center' }}>% | G</th>
             </tr>
 
             {mostrarIA && (
@@ -710,7 +710,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                         </div>
                       ) : t ? (
                         <span style={{ fontSize: '8px', color: C.accent, fontWeight: 600, display: 'block', lineHeight: '1' }}>{t.mercado.replace('OVER ','O').replace('UNDER ','U')}</span>
-                      ) : <span style={{ color: C.textDim + '44' }}>-</span>}
+                      ) : <span style={{ color: '#ffffff' + '44' }}>-</span>}
                     </td>
                   )
                 })}
@@ -719,13 +719,13 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             )}
 
             <tr>
-              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px 5px', color: C.textDim, fontSize: '8px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
+              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px 5px', color: '#ffffff', fontSize: '8px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
               {cols.map(col => (
-                <th key={col} style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: C.textDim, fontSize: '9px', textAlign: 'center' }}>
+                <th key={col} style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: '#ffffff', fontSize: '9px', textAlign: 'center' }}>
                   {col.replace('tempo', '')}
                 </th>
               ))}
-              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: C.textDim, fontSize: '9px', textAlign: 'center' }}>% | G</th>
+              <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: '#ffffff', fontSize: '9px', textAlign: 'center' }}>% | G</th>
             </tr>
           </thead>
           <tbody>
@@ -746,13 +746,13 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                           <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color: '#ffffff', textAlign: 'center' }}>
                             {p.texto}
                           </span>
-                        ) : <span style={{ color: C.textDim + '44', fontSize: '9px' }}>-</span>}
+                        ) : <span style={{ color: '#ffffff' + '44', fontSize: '9px' }}>-</span>}
                       </td>
                     )
                   })}
                   <td style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '0 4px', textAlign: 'center', height: '20px' }}>
                     <span style={{ fontSize: '9px', fontWeight: 700, color: ls && ls.pct >= 50 ? C.green : C.red }}>{ls ? ls.pct : 0}%</span>
-                    <span style={{ fontSize: '9px', color: C.textDim, marginLeft: '3px' }}>{ls ? ls.totalGols : 0}g</span>
+                    <span style={{ fontSize: '9px', color: '#ffffff', marginLeft: '3px' }}>{ls ? ls.totalGols : 0}g</span>
                   </td>
                 </tr>
               )
@@ -763,7 +763,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
 
       {/* LEGENDA */}
       {mostrarIA && (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 12px', fontSize: '10px', color: C.textMid }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 12px', fontSize: '10px', color: '#ffffff' }}>
           <span style={{ color: C.accent, fontWeight: 700 }}>IA T{tipoIA} </span>
           {tipoIA === 1 && 'Compara linha atual com a anterior'}
           {tipoIA === 2 && 'Compara 3 linhas consecutivas'}
