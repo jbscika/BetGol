@@ -86,7 +86,7 @@ function Dashboard() {
       await Promise.all(Object.keys(LIGAS).map(async (liga) => {
         if (liga === ligaSelecionada) return
         try {
-          const resp = await fetch(`${API}/resultados-locais?liga=${encodeURIComponent(liga)}`)
+          const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(liga)}`)
           const json = await resp.json()
           const { linhas: l } = parsearResposta(json)
           if (l.length > 0) resultados[liga] = l
@@ -99,7 +99,7 @@ function Dashboard() {
   async function buscarDadosSilencioso() {
     try {
       const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
-      const resp = await fetch(`${API}/resultados-locais?liga=${encodeURIComponent(ligaSelecionada)}`)
+      const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`)
       const json = await resp.json()
       const { linhas: l, colunas: c, horas: h } = parsearResposta(json)
       if (l.length === 0) return
@@ -117,7 +117,7 @@ function Dashboard() {
       setCarregando(true)
       setErro(null)
       const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
-      const resp = await fetch(`${API}/resultados-locais?liga=${encodeURIComponent(ligaSelecionada)}`)
+      const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`)
       const json = await resp.json()
       const { linhas: l, colunas: c, horas: h } = parsearResposta(json)
       if (l.length === 0) throw new Error('Sem dados')
