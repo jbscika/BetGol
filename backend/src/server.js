@@ -20,10 +20,7 @@ app.get('/', (req, res) => {
   res.json({ status: 'BetGol API Online', versao: '7.0 - AnaliseTips + Firebase' });
 });
 
-// =========================================================================
-// FUNÇÃO: Busca dados da AnaliseTips
-// =========================================================================
-async function buscarAnaliseTips(league, rows = 20) {
+async function buscarAnaliseTips(league, rows = 720) {
   try {
     const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${league}&page=1&rows=${rows}&method=resultsBoth`;
     const resp = await fetch(url, {
@@ -44,22 +41,46 @@ async function buscarAnaliseTips(league, rows = 20) {
 }
 
 // =========================================================================
-// ROTA: Resultados Locais
-// Tenta buscar do Firebase primeiro, se vazio busca da AnaliseTips
+// ROTA: /resultados — busca AnaliseTips direto (rota principal do frontend)
+// =========================================================================
+app.get('/resultados', async (req, res) => {
+  try {
+    const ligaPedida = req.query.liga;
+    const leagueId = LIGAS_MAP[ligaPedida];
+
+    if (!leagueId) {
+      return res.status(400).json({ error: true, message: 'Liga invalida' });
+    }
+
+    console.log(`[ANALISETIPS] Buscando ${ligaPedida}...`);
+    const dados = await buscarAnaliseTips(leagueId);
+
+    if (!dados || !dados.linhas) {
+      return res.status(503).json({ error: true, message: 'AnaliseTips indisponivel' });
+    }
+
+    console.log(`[ANALISETIPS] ${ligaPedida}: ${dados.linhas.length} linhas`);
+    return res.json({ error: false, data: dados });
+  } catch (erro) {
+    console.error('Erro /resultados:', erro);
+    res.status(500).json({ error: true, message: 'Erro interno' });
+  }
+});
+
+// =========================================================================
+// ROTA: /resultados-locais — Firebase com fallback AnaliseTips
 // =========================================================================
 app.get('/resultados-locais', async (req, res) => {
   try {
     const ligaPedida = req.query.liga;
     const leagueId = LIGAS_MAP[ligaPedida];
 
-    // Tenta buscar do Firebase primeiro
     let query = db.collection('partidas');
     if (ligaPedida) {
       query = query.where('liga', '==', ligaPedida);
     }
     const snapshot = await query.limit(700).get();
 
-    // Se tem dados suficientes no Firebase, usa eles
     if (!snapshot.empty && snapshot.size >= 10) {
       const jogos = [];
       snapshot.forEach(doc => jogos.push(doc.data()));
@@ -95,13 +116,11 @@ app.get('/resultados-locais', async (req, res) => {
       return res.json(linhas);
     }
 
-    // Se não tem dados no Firebase, busca da AnaliseTips
+    // Fallback AnaliseTips
     if (leagueId) {
-      console.log(`[ANALISETIPS] Buscando ${ligaPedida}...`);
+      console.log(`[ANALISETIPS fallback] Buscando ${ligaPedida}...`);
       const dados = await buscarAnaliseTips(leagueId);
-
       if (dados && dados.linhas) {
-        console.log(`[ANALISETIPS] ${ligaPedida}: ${dados.linhas.length} linhas`);
         return res.json(dados.linhas);
       }
     }
@@ -114,7 +133,7 @@ app.get('/resultados-locais', async (req, res) => {
 });
 
 // =========================================================================
-// ROTA: Capturar — recebe dados da extensão
+// ROTA: /capturar
 // =========================================================================
 app.post('/capturar', async (req, res) => {
   try {
@@ -125,7 +144,7 @@ app.post('/capturar', async (req, res) => {
     dados.timestamp = Date.now();
     const docId = `${dados.liga}-${dados.id_evento}`;
     await db.collection('partidas').doc(docId).set(dados, { merge: true });
-    console.log(`[EXTENSÃO] Jogo salvo: ${dados.liga} às ${dados.horario || '---'}`);
+    console.log(`[EXTENSAO] Jogo salvo: ${dados.liga} as ${dados.horario || '---'}`);
     res.json({ sucesso: true });
   } catch (erro) {
     console.error('Erro ao capturar:', erro);
@@ -134,7 +153,7 @@ app.post('/capturar', async (req, res) => {
 });
 
 // =========================================================================
-// ROTA: Atualizar Resultado — salva placar real
+// ROTA: /atualizar-resultado
 // =========================================================================
 app.post('/atualizar-resultado', async (req, res) => {
   try {
@@ -158,7 +177,6 @@ app.post('/atualizar-resultado', async (req, res) => {
   }
 });
 
-// =========================================================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`SERVIDOR BETGOL RODANDO NA PORTA ${PORT}`);
