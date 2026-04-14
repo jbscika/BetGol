@@ -43,15 +43,17 @@ function verificarMercado(p: { casa: number; fora: number; gols: number }, merca
 
 // Threshold minimo por mercado - ambas marcam tem distribuicao diferente de over/under
 function thresholdMercado(mercado: string): number {
-  if (mercado === 'AMBAS SIM' || mercado === 'AMBAS NAO') return 65
-  if (mercado === 'EMPATE') return 60
-  if (mercado === 'CASA' || mercado === 'FORA') return 62
-  return 70 // OVER/UNDER
+  if (mercado === 'AMBAS SIM' || mercado === 'AMBAS NAO') return 70
+  if (mercado === 'EMPATE') return 65
+  if (mercado === 'CASA' || mercado === 'FORA') return 68
+  return 75 // OVER/UNDER
 }
 
 function minEntradasMercado(mercado: string): number {
-  if (mercado === 'AMBAS SIM' || mercado === 'AMBAS NAO') return 5
-  return 6
+  // Com 20 linhas, exigir minimo de 8 entradas para ser estatisticamente relevante
+  if (mercado === 'AMBAS SIM' || mercado === 'AMBAS NAO') return 8
+  if (mercado === 'EMPATE') return 7
+  return 8
 }
 
 function buscarPadroesAuto(linhas: Partida[], colunas: string[]): Padrao[] {
@@ -257,8 +259,10 @@ export default function IATendencia({ linhas, colunas }: Props) {
     if (linhas.length < 5) return
     setBuscando(true)
     setTimeout(() => {
-      setPadroes(buscarPadroesAuto(linhas, cols))
-      setGeral(analisarGeral(linhas, cols))
+      // Usar as ultimas 24 linhas (24 horas)
+      const linhas20 = linhas.filter(l => cols.some(c => l[c])).slice(0, 24)
+      setPadroes(buscarPadroesAuto(linhas20, cols))
+      setGeral(analisarGeral(linhas20, cols))
       setBuscando(false)
     }, 100)
   }, [linhas, colunas])
