@@ -509,67 +509,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </div>
       </div>
 
-      {/* MELHORES MINUTOS - PAINEIS */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px', padding: '8px 12px' }}>
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
-          {([
-            { key: 'casa' as const, lbl: 'VITORIA CASA' },
-            { key: 'fora' as const, lbl: 'VITORIA FORA' },
-            { key: 'gols' as const, lbl: 'MAIS GOLS' },
-          ]).map(b => (
-            <button key={b.key} className="betgol-btn" onClick={() => setPainelAtivo(b.key)} style={{
-              padding: '4px 10px', border: `1px solid ${painelAtivo === b.key ? C.accent : C.border}`,
-              borderRadius: '4px', background: painelAtivo === b.key ? C.accent + '22' : 'transparent',
-              color: painelAtivo === b.key ? C.accent : '#ffffff',
-              fontWeight: 700, fontSize: '9px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '1px',
-            }}>
-              {b.lbl}
-            </button>
-          ))}
-        </div>
-        <div style={{ fontSize: '9px', color: '#ffffff', letterSpacing: '1px', marginBottom: '4px' }}>
-          {painelAtivo === 'casa' ? 'MELHORES MINUTOS - VITORIA CASA (ult. 20 rodadas)' :
-           painelAtivo === 'fora' ? 'MELHORES MINUTOS - VITORIA FORA (ult. 20 rodadas)' :
-           'MINUTOS COM MAIS GOLS (ult. 20 rodadas)'}
-        </div>
-        {painelAtivo === 'casa' && melhoresParaApostar.melhorCasa.map((t, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ color: i < 3 ? C.accent : '#ffffff', fontWeight: 700 }}>MIN {t.min}</span>
-              <span style={{ color: '#ffffff', fontSize: '10px' }}>{proximaHora(t.min)}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <span style={{ color: '#ffffff', fontSize: '10px' }}>{t.total}j</span>
-              <span style={{ color: C.green, fontWeight: 700 }}>{t.pctCasa}% casa vence</span>
-            </div>
-          </div>
-        ))}
-        {painelAtivo === 'fora' && melhoresParaApostar.melhorFora.map((t, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ color: i < 3 ? C.accent : '#ffffff', fontWeight: 700 }}>MIN {t.min}</span>
-              <span style={{ color: '#ffffff', fontSize: '10px' }}>{proximaHora(t.min)}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <span style={{ color: '#ffffff', fontSize: '10px' }}>{t.total}j</span>
-              <span style={{ color: C.red, fontWeight: 700 }}>{t.pctFora}% fora vence</span>
-            </div>
-          </div>
-        ))}
-        {painelAtivo === 'gols' && melhoresParaApostar.maisGols.map((t, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: `1px solid ${C.border}`, fontSize: '11px' }}>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ color: i < 3 ? C.accent : '#ffffff', fontWeight: 700 }}>MIN {t.min}</span>
-              <span style={{ color: '#ffffff', fontSize: '10px' }}>{proximaHora(t.min)}</span>
-            </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <span style={{ color: '#ffffff', fontSize: '10px' }}>{t.total}j</span>
-              <span style={{ color: C.accent, fontWeight: 700 }}>{t.mediaGols} gols/j | {t.pctOver}% over2.5</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* ANOMALIAS */}
       {anomalias.length > 0 && (
         <div style={{ background: '#1a1000', border: '2px solid #ff9800', borderRadius: '8px', padding: '8px 12px' }}>
@@ -587,22 +526,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             ))}
           </div>
           <div style={{ fontSize: '9px', color: '#ff9800', marginTop: '6px' }}>Minutos onde resultado recente diverge do historico - correcao esperada</div>
-        </div>
-      )}
-
-      {/* CRUZAMENTO LIGAS */}
-      {cruzamentoLigas.length > 0 && (
-        <div style={{ background: '#0e0a1a', border: '2px solid #9c27b0', borderRadius: '8px', padding: '8px 12px' }}>
-          <div style={{ fontSize: '9px', fontWeight: 700, color: '#ce93d8', marginBottom: '6px', letterSpacing: '2px' }}>CRUZAMENTO DE LIGAS - CICLOS OPOSTOS</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {cruzamentoLigas.map((c2, i) => (
-              <div key={i} style={{ background: C.surface2, border: '1px solid #9c27b0', borderRadius: '6px', padding: '6px 10px', minWidth: '140px' }}>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: '#ce93d8', marginBottom: '2px' }}>{c2.liga}</div>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: C.green }}>{c2.sinal}</div>
-                <div style={{ fontSize: '9px', color: '#ffffff' }}>MIN {c2.minuto} | {c2.pct}% recente</div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -648,36 +571,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           <button className="betgol-btn" onClick={limpar} style={{ flex: 1, background: 'transparent', color: '#ffffff', border: `1px solid ${C.border}`, padding: '6px', fontSize: '11px', borderRadius: '4px', cursor: 'pointer', fontFamily: 'inherit' }}>LIMPAR</button>
         </div>
       </div>
-
-      {/* MELHORES ENTRADAS IA */}
-      {mostrarIA && melhores.length > 0 && (
-        <div style={{ background: C.greenDim, border: `2px solid ${C.green}`, borderRadius: '8px', padding: '8px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: C.green }} />
-            <span style={{ fontSize: '10px', fontWeight: 800, color: C.green, letterSpacing: '1px' }}>MELHORES ENTRADAS - PROXIMA PARTIDA</span>
-            <span style={{ fontSize: '9px', color: '#ffffff' }}>IA TIPO {tipoIA}</span>
-            {liga && <span style={{ fontSize: '9px', background: C.green + '22', color: C.green, borderRadius: '3px', padding: '1px 6px', border: `1px solid ${C.green}`, fontWeight: 700 }}>{liga.toUpperCase()}</span>}
-            <button className="betgol-btn" onClick={() => { setAlertaSom(!alertaSom); tocarAlerta() }} style={{ marginLeft: 'auto', background: alertaSom ? C.green + '22' : 'transparent', color: alertaSom ? C.green : '#ffffff', border: `1px solid ${alertaSom ? C.green : C.border}`, borderRadius: '4px', padding: '3px 8px', fontSize: '10px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-              {alertaSom ? 'SOM ON' : 'SOM OFF'}
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto' }}>
-            {melhores.map((t, i) => (
-              <div key={i} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: '6px', padding: '6px 10px', minWidth: '95px', flex: '0 0 auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '9px', color: '#ffffff' }}>MIN {t.minuto}</span>
-                  <span style={{ fontSize: '9px', color: C.accent, fontWeight: 700 }}>{proximaHora(t.minuto)}</span>
-                </div>
-                <div style={{ fontSize: '9px', fontWeight: 800, color: C.text, marginBottom: '2px' }}>{t.mercado}</div>
-                <div style={{ fontSize: '20px', fontWeight: 800, color: C.accent, fontFamily: 'monospace', lineHeight: '1.1' }}>{t.probabilidade}%</div>
-                <div style={{ fontSize: '9px', color: C.green, fontWeight: 700 }}>Conf: {t.confianca}%</div>
-                <div style={{ fontSize: '10px', fontWeight: 700, color: C.red, fontFamily: 'monospace' }}>{countdown(t.minuto)}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ fontSize: '9px', color: C.green + 'aa', marginTop: '4px' }}>Aposte apenas quando prob &gt;= 65% E confianca &gt;= 70%</div>
-        </div>
-      )}
 
       {/* GRADE PRINCIPAL */}
       <div style={{ overflowX: 'auto', width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px' }}>
