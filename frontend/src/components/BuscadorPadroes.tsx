@@ -28,6 +28,18 @@ const MERCADOS = [
   'Vitoria Casa', 'Empate', 'Vitoria Fora',
 ]
 
+const GALES = [
+  { label: 'G1 (sem gale)', value: 1 },
+  { label: 'G2 (1 gale)', value: 2 },
+  { label: 'G3 (2 gales)', value: 3 },
+]
+
+const HORAS_OPCOES = [
+  { label: 'Ultimas 24h', value: 24 },
+  { label: 'Ultimas 36h', value: 36 },
+  { label: 'Ultimas 48h', value: 48 },
+]
+
 function extrairPlacar(val: string | null): { casa: number; fora: number } | null {
   if (!val) return null
   const linha = typeof val === 'string' ? val.split('</br>')[0].split('<br>')[0].trim() : String(val)
@@ -75,7 +87,8 @@ function buscarPadroes(
   repeticoes: number,
   maxPulos: number,
   liga: string,
-  minPct: number = 70
+  minPct: number,
+  gale: number
 ): Resultado[] {
   const resultados: Resultado[] = []
 
@@ -87,13 +100,10 @@ function buscarPadroes(
       if (colAlvoIdx >= colunas.length) continue
       const colAlvo = colunas[colAlvoIdx]
 
-      let entradas = 0
-      let greens = 0
-      let reds = 0
+      let entradas = 0, greens = 0, reds = 0
       let ultimoPadrao = ''
 
-      for (let linhaIdx = 0; linhaIdx <= linhas.length - repeticoes - 1; linhaIdx++) {
-        // Verificar se as N linhas seguidas tem o mesmo placar
+      for (let linhaIdx = 0; linhaIdx <= linhas.length - repeticoes - gale; linhaIdx++) {
         let padraoValido = true
         let primeiroPlacar = ''
 
@@ -107,16 +117,23 @@ function buscarPadroes(
 
         if (!padraoValido || !primeiroPlacar) continue
 
-        // Verificar resultado na linha seguinte na coluna alvo
+        let acertou = false
+        for (let g = 0; g < gale; g++) {
+          const linhaAlvoIdx = linhaIdx + repeticoes + g
+          if (linhaAlvoIdx >= linhas.length) break
+          const pAlvo = extrairPlacar(linhas[linhaAlvoIdx][colAlvo] as string)
+          if (!pAlvo) continue
+          if (verificarMercado(pAlvo, mercado)) { acertou = true; break }
+        }
+
         const linhaAlvoIdx = linhaIdx + repeticoes
         if (linhaAlvoIdx >= linhas.length) continue
-
         const pAlvo = extrairPlacar(linhas[linhaAlvoIdx][colAlvo] as string)
         if (!pAlvo) continue
 
         entradas++
         ultimoPadrao = primeiroPlacar
-        if (verificarMercado(pAlvo, mercado)) greens++
+        if (acertou) greens++
         else reds++
       }
 
@@ -126,9 +143,7 @@ function buscarPadroes(
           minuto: col.replace('tempo', ''),
           pulos,
           minutoEntrada: colAlvo.replace('tempo', ''),
-          entradas,
-          greens,
-          reds,
+          entradas, greens, reds,
           pct: Math.round(greens / entradas * 100),
           liga,
         })
@@ -140,10 +155,13 @@ function buscarPadroes(
 }
 
 export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTodasLigas }: Props) {
+  const [aberto, setAberto] = useState(false)
   const [mercado, setMercado] = useState('Over 2.5')
   const [repeticoes, setRepeticoes] = useState(3)
   const [maxPulos, setMaxPulos] = useState(10)
   const [minPct, setMinPct] = useState(70)
+  const [gale, setGale] = useState(1)
+  const [horas, setHoras] = useState(24)
   const [ligasSelecionadas, setLigasSelecionadas] = useState<string[]>(ligas || [])
   const [buscando, setBuscando] = useState(false)
   const [resultados, setResultados] = useState<Resultado[]>([])
@@ -157,12 +175,12 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
   function buscar() {
     setBuscando(true)
     setResultados([])
-
     setTimeout(() => {
       const todos: Resultado[] = []
+      const linhasLimitadas = linhas.filter(l => colunas.some(c => l[c])).slice(0, horas)
 
-      if (liga && ligasSelecionadas.includes(liga) && linhas.length > 0) {
-        todos.push(...buscarPadroes(linhas, colunas, mercado, repeticoes, maxPulos, liga, minPct))
+      if (liga && ligasSelecionadas.includes(liga) && linhasLimitadas.length > 0) {
+        todos.push(...buscarPadroes(linhasLimitadas, colunas, mercado, repeticoes, maxPulos, liga, minPct, gale))
       }
 
       if (dadosTodasLigas) {
@@ -170,7 +188,8 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
           if (!ligasSelecionadas.includes(nomeLiga)) continue
           if (!dadosLiga || dadosLiga.length === 0) continue
           const colsLiga = detectarColunasLiga(dadosLiga)
-          todos.push(...buscarPadroes(dadosLiga, colsLiga, mercado, repeticoes, maxPulos, nomeLiga, minPct))
+          const dadosLimitados = dadosLiga.filter(l => colsLiga.some(c => l[c])).slice(0, horas)
+          todos.push(...buscarPadroes(dadosLimitados, colsLiga, mercado, repeticoes, maxPulos, nomeLiga, minPct, gale))
         }
       }
 
@@ -185,25 +204,39 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
   const vermelho = '#c0392b'
 
   return (
-    <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #ddd', padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, color: azul, fontSize: '18px' }}>Buscador de Padroes</h2>
-      </div>
-      <div>
+    <>
+      <button onClick={() => setAberto(true)} style={{
+        background: azul, color: '#fff', border: 'none',
+        borderRadius: '6px', padding: '8px 16px',
+        fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+        letterSpacing: '1px', alignSelf: 'flex-start',
+      }}>
+        BUSCADOR DE PADROES
+      </button>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+      {aberto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '12px',
+            width: '100%', maxWidth: '950px', maxHeight: '90vh',
+            overflow: 'auto', padding: '24px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, color: azul, fontSize: '18px' }}>Buscador de Padroes</h2>
+              <button onClick={() => setAberto(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#666' }}>X</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '16px' }}>
               <div>
-                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>ENTRADA</label>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MERCADO</label>
                 <select value={mercado} onChange={e => setMercado(e.target.value)}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
                   {MERCADOS.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>PADROES SEGUIDOS</label>
-                <select value={repeticoes} onChange={e => setRepeticoes(parseInt(e.target.value))}
-                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-                  {[2, 3, 4, 5, 6].map(n => <option key={n} value={n}>{n}x seguidos</option>)}
                 </select>
               </div>
               <div>
@@ -211,6 +244,20 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                 <select value={maxPulos} onChange={e => setMaxPulos(parseInt(e.target.value))}
                   style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
                   {[5, 10, 15, 20, 30, 40, 50, 60].map(n => <option key={n} value={n}>{n} pulos</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>GALE</label>
+                <select value={gale} onChange={e => setGale(parseInt(e.target.value))}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
+                  {GALES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MAX HORAS</label>
+                <select value={horas} onChange={e => setHoras(parseInt(e.target.value))}
+                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
+                  {HORAS_OPCOES.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
                 </select>
               </div>
               <div>
@@ -251,6 +298,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
               <div>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', marginBottom: '10px' }}>
                   {resultados.length} padroes encontrados - ordenados por % de acerto
+                  {gale > 1 && <span style={{ marginLeft: '8px', color: azul }}>({gale === 2 ? '1 gale' : '2 gales'})</span>}
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
@@ -289,7 +337,9 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                 Configure os filtros e clique em Buscar para encontrar padroes
               </div>
             )}
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
