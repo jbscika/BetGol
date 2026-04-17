@@ -18,6 +18,7 @@ interface Resultado {
   greens: number
   reds: number
   pct: number
+  pctRecente: number
   liga: string
 }
 
@@ -80,6 +81,16 @@ function detectarColunasLiga(dadosLiga: Partida[]): string[] {
   return Array.from(colSet).sort((a, b) => a - b).map(n => `tempo${String(n).padStart(2, '0')}`)
 }
 
+// Minimo de entradas por % para evitar falsos positivos
+function minEntradasPorPct(pct: number): number {
+  if (pct === 100) return 8
+  if (pct >= 95) return 10
+  if (pct >= 90) return 12
+  if (pct >= 85) return 14
+  if (pct >= 80) return 16
+  return 18
+}
+
 function buscarPadroes(
   linhas: Partida[],
   colunas: string[],
@@ -91,6 +102,7 @@ function buscarPadroes(
   gale: number
 ): Resultado[] {
   const resultados: Resultado[] = []
+  const minEnt = minEntradasPorPct(minPct)
 
   for (let colIdx = 0; colIdx < colunas.length; colIdx++) {
     const col = colunas[colIdx]
@@ -100,7 +112,8 @@ function buscarPadroes(
       if (colAlvoIdx >= colunas.length) continue
       const colAlvo = colunas[colAlvoIdx]
 
-      let entradas = 0, greens = 0, reds = 0
+      // Coletar todas as ocorrencias com indice para peso por recencia
+      const ocorrencias: { linhaIdx: number; acertou: boolean }[] = []
       let ultimoPadrao = ''
 
       for (let linhaIdx = 0; linhaIdx <= linhas.length - repeticoes - gale; linhaIdx++) {
@@ -117,6 +130,7 @@ function buscarPadroes(
 
         if (!padraoValido || !primeiroPlacar) continue
 
+        // Verificar resultado com gale
         let acertou = false
         for (let g = 0; g < gale; g++) {
           const linhaAlvoIdx = linhaIdx + repeticoes + g
@@ -131,27 +145,44 @@ function buscarPadroes(
         const pAlvo = extrairPlacar(linhas[linhaAlvoIdx][colAlvo] as string)
         if (!pAlvo) continue
 
-        entradas++
         ultimoPadrao = primeiroPlacar
-        if (acertou) greens++
-        else reds++
+        ocorrencias.push({ linhaIdx, acertou })
       }
 
-      if (entradas >= 5 && greens / entradas >= minPct / 100) {
-        resultados.push({
-          padrao: ultimoPadrao,
-          minuto: col.replace('tempo', ''),
-          pulos,
-          minutoEntrada: colAlvo.replace('tempo', ''),
-          entradas, greens, reds,
-          pct: Math.round(greens / entradas * 100),
-          liga,
-        })
-      }
+      const entradas = ocorrencias.length
+      if (entradas < minEnt) continue
+
+      const greens = ocorrencias.filter(o => o.acertou).length
+      const reds = entradas - greens
+      const pct = Math.round(greens / entradas * 100)
+      if (pct < minPct) continue
+
+      // Consistencia recente: ultimas 5 ocorrencias
+      const recentes = ocorrencias.slice(0, Math.min(5, entradas))
+      const greensRecentes = recentes.filter(o => o.acertou).length
+      const pctRecente = Math.round(greensRecentes / recentes.length * 100)
+
+      // Filtro de consistencia: deve ter acertado pelo menos nas ultimas 3
+      const ultimas3 = ocorrencias.slice(0, Math.min(3, entradas))
+      const acertouUltimas3 = ultimas3.filter(o => o.acertou).length
+      if (acertouUltimas3 < Math.min(2, ultimas3.length)) continue
+
+      resultados.push({
+        padrao: ultimoPadrao,
+        minuto: col.replace('tempo', ''),
+        pulos,
+        minutoEntrada: colAlvo.replace('tempo', ''),
+        entradas, greens, reds, pct, pctRecente, liga,
+      })
     }
   }
 
-  return resultados.sort((a, b) => b.pct - a.pct || b.entradas - a.entradas)
+  // Ordenar por combinacao de pct total + pct recente
+  return resultados.sort((a, b) => {
+    const scoreA = a.pct * 0.6 + a.pctRecente * 0.4
+    const scoreB = b.pct * 0.6 + b.pctRecente * 0.4
+    return scoreB - scoreA || b.entradas - a.entradas
+  })
 }
 
 export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTodasLigas }: Props) {
@@ -193,7 +224,11 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
         }
       }
 
-      todos.sort((a, b) => b.pct - a.pct || b.entradas - a.entradas)
+      todos.sort((a, b) => {
+        const scoreA = a.pct * 0.6 + a.pctRecente * 0.4
+        const scoreB = b.pct * 0.6 + b.pctRecente * 0.4
+        return scoreB - scoreA || b.entradas - a.entradas
+      })
       setResultados(todos.slice(0, 50))
       setBuscando(false)
     }, 100)
@@ -297,14 +332,14 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
             {resultados.length > 0 && (
               <div>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', marginBottom: '10px' }}>
-                  {resultados.length} padroes encontrados - ordenados por % de acerto
+                  {resultados.length} padroes encontrados - ordenados por % total + % recente
                   {gale > 1 && <span style={{ marginLeft: '8px', color: azul }}>({gale === 2 ? '1 gale' : '2 gales'})</span>}
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                     <thead>
                       <tr style={{ background: azul, color: '#fff' }}>
-                        {['PADRAO','MIN PADRAO','PULOS','MIN ENTRADA','LIGA','ENTRADAS','GREENS','REDS','%'].map(h => (
+                        {['PADRAO','MIN PADRAO','PULOS','MIN ENTRADA','LIGA','ENTRADAS','GREENS','REDS','%','RECENTE'].map(h => (
                           <th key={h} style={{ padding: '10px', textAlign: h === 'PADRAO' ? 'left' : 'center' }}>{h}</th>
                         ))}
                       </tr>
@@ -323,6 +358,10 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
                           <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, fontSize: '14px',
                             color: r.pct >= 95 ? verde : r.pct >= 90 ? '#b8960c' : vermelho }}>
                             {r.pct}%
+                          </td>
+                          <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, fontSize: '12px',
+                            color: r.pctRecente >= 80 ? verde : r.pctRecente >= 60 ? '#b8960c' : vermelho }}>
+                            {r.pctRecente}%
                           </td>
                         </tr>
                       ))}
