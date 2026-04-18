@@ -658,11 +658,17 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: piscando ? '#ff9800' : 'transparent', border: '2px solid #ff9800', transition: 'background 0.3s', flexShrink: 0 }} />
           <span style={{ fontSize: '10px', color: '#ff9800', fontWeight: 700, letterSpacing: '2px' }}>ENTRADAS MARCADAS</span>
           <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {entradasMarcadas.map(col => (
-              <span key={col} style={{ background: '#ff6600', color: '#fff', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', fontWeight: 800 }}>
-                MIN {col.replace('tempo', '')}
-              </span>
-            ))}
+            {entradasMarcadas.map(col => {
+              const min = col.replace('tempo', '')
+              const tend = melhoresFortes.find(t => t.minuto === min)
+              return (
+                <div key={col} style={{ background: '#ff6600', borderRadius: '6px', padding: '4px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <span style={{ color: '#fff', fontSize: '11px', fontWeight: 800 }}>MIN {min}</span>
+                  {tend && <span style={{ color: '#ffe0b2', fontSize: '9px', fontWeight: 700 }}>{tend.mercado}</span>}
+                  {tend && <span style={{ color: '#fff9c4', fontSize: '9px' }}>{tend.probabilidade}% | C:{tend.confianca}%</span>}
+                </div>
+              )
+            })}
           </div>
           <span style={{ fontSize: '9px', color: '#ffffff88' }}>clique no MIN para remover</span>
           <button onClick={() => { setEntradasMarcadas([]); setPiscando(false) }}
