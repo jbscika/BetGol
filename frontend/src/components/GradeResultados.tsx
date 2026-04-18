@@ -260,7 +260,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const [painelAtivo, setPainelAtivo] = useState<'casa' | 'fora' | 'gols'>('casa')
   const [alertaSom, setAlertaSom] = useState(true)
   const [agora, setAgora] = useState(new Date())
-  const [entradaMarcada, setEntradaMarcada] = useState<{ col: string; texto: string } | null>(null)
+  const [entradasMarcadas, setEntradasMarcadas] = useState<string[]>([])
   const [piscando, setPiscando] = useState(false)
   const [placarSelecionado, setPlacarSelecionado] = useState<string | null>(null)
   const intervaloAlertaRef = useState<any>(null)
@@ -271,26 +271,30 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     return () => clearInterval(timer)
   }, [])
 
-  // Piscar a celula marcada
+  // Piscar colunas marcadas
   useMemo(() => {
-    if (!entradaMarcada) { setPiscando(false); return }
+    if (entradasMarcadas.length === 0) { setPiscando(false); return }
     const t = setInterval(() => setPiscando(p => !p), 500)
     return () => clearInterval(t)
-  }, [entradaMarcada])
+  }, [entradasMarcadas])
 
   function togglePlacar(texto: string) {
     setPlacarSelecionado(prev => prev === texto ? null : texto)
   }
 
   function marcarEntrada(col: string) {
-    if (entradaMarcada?.col === col) {
-      setEntradaMarcada(null)
-      setPiscando(false)
-      tocarConfirmacao()
-    } else {
-      setEntradaMarcada({ col, texto: col.replace('tempo', '') })
-      tocarAlertaEntrada()
-    }
+    setEntradasMarcadas(prev => {
+      if (prev.includes(col)) {
+        // Remove o minuto da lista
+        const novo = prev.filter(c => c !== col)
+        if (novo.length === 0) setPiscando(false)
+        return novo
+      } else {
+        // Adiciona o minuto na lista
+        tocarAlertaEntrada()
+        return [...prev, col]
+      }
+    })
   }
 
   function tocarAlertaEntrada() {
@@ -631,15 +635,21 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
       </div>
 
       {/* ENTRADA MARCADA */}
-      {entradaMarcada && (
-        <div style={{ background: piscando ? '#2a1500' : '#1a1000', border: '2px solid #ff9800', borderRadius: '8px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', transition: 'background 0.3s' }}>
-          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: piscando ? '#ff9800' : 'transparent', border: '2px solid #ff9800', transition: 'background 0.3s' }} />
-          <span style={{ fontSize: '10px', color: '#ff9800', fontWeight: 700, letterSpacing: '2px' }}>ENTRADA MARCADA</span>
-          <span style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>MIN {entradaMarcada.col.replace('tempo', '')}</span>
-          <span style={{ fontSize: '9px', color: '#ffffff88' }}>duplo clique no MIN novamente para confirmar</span>
-          <button onClick={() => { setEntradaMarcada(null); setPiscando(false) }}
+      {entradasMarcadas.length > 0 && (
+        <div style={{ background: piscando ? '#2a1500' : '#1a1000', border: '2px solid #ff9800', borderRadius: '8px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', transition: 'background 0.3s' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: piscando ? '#ff9800' : 'transparent', border: '2px solid #ff9800', transition: 'background 0.3s', flexShrink: 0 }} />
+          <span style={{ fontSize: '10px', color: '#ff9800', fontWeight: 700, letterSpacing: '2px' }}>ENTRADAS MARCADAS</span>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {entradasMarcadas.map(col => (
+              <span key={col} style={{ background: '#ff6600', color: '#fff', borderRadius: '4px', padding: '2px 8px', fontSize: '11px', fontWeight: 800 }}>
+                MIN {col.replace('tempo', '')}
+              </span>
+            ))}
+          </div>
+          <span style={{ fontSize: '9px', color: '#ffffff88' }}>clique no MIN para remover</span>
+          <button onClick={() => { setEntradasMarcadas([]); setPiscando(false) }}
             style={{ marginLeft: 'auto', background: 'none', border: '1px solid #ff9800', color: '#ff9800', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit', fontWeight: 700 }}>
-            CANCELAR
+            LIMPAR TUDO
           </button>
         </div>
       )}
@@ -686,15 +696,15 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
             <tr>
               <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px 5px', color: '#ffffff', fontSize: '8px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
               {cols.map(col => {
-                const isEntradaCol = entradaMarcada?.col === col
+                const isEntradaCol = entradasMarcadas.includes(col)
                 return (
                   <th key={col}
-                    onDoubleClick={() => marcarEntrada(col)}
-                    title="Duplo clique para marcar entrada"
+                    onClick={() => marcarEntrada(col)}
+                    title="Clique para marcar/desmarcar entrada"
                     style={{
                       background: isEntradaCol ? (piscando ? '#ff6600' : '#cc4400') : C.surface2,
                       border: `1px solid ${isEntradaCol ? '#ff9800' : C.border}`,
-                      padding: '3px', color: isEntradaCol ? '#ffffff' : '#ffffff',
+                      padding: '3px', color: '#ffffff',
                       fontSize: '9px', textAlign: 'center', cursor: 'pointer',
                       transition: 'background 0.3s',
                     }}>
@@ -717,7 +727,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     const isSelecionado = p !== null && placarSelecionado === p.texto
-                    const isEntradaCol = entradaMarcada?.col === col
+                    const isEntradaCol = entradasMarcadas.includes(col)
                     const bgColor = !p ? C.bg
                       : isSelecionado ? '#ff9800'
                       : isEntradaCol ? (piscando ? '#2a1000' : '#1a0800')
