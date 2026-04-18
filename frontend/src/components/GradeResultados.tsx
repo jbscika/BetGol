@@ -452,6 +452,21 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
     .slice(0, 5)
 
+  // Alerta automatico da IA - quando melhores muda e tem entrada forte, pisca e emite som
+  const melhoresKey = melhores.map(m => m.minuto + m.mercado).join(',')
+  useMemo(() => {
+    if (!mostrarIA || melhores.length === 0) return
+    // Marcar automaticamente os MINs das melhores entradas
+    const cols_melhores = melhores.map(m => 'tempo' + m.minuto.padStart(2, '0'))
+    setEntradasMarcadas(prev => {
+      // So adiciona se ainda nao estiver marcado (nao sobrescreve selecao manual)
+      const novos = cols_melhores.filter(c => !prev.includes(c))
+      if (novos.length === 0) return prev
+      if (alertaSom) tocarAlerta()
+      return [...prev, ...novos]
+    })
+  }, [melhoresKey, mostrarIA])
+
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
   function setFiltroAuto(novoFiltro: typeof FILTRO_VAZIO) { setFiltros(novoFiltro); setFiltrosAtivos(novoFiltro) }
