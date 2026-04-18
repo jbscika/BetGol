@@ -167,7 +167,7 @@ function buscarPadroes(
 
 export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTodasLigas }: Props) {
   const [mercado, setMercado] = useState('Over 2.5')
-  const [repeticoes, setRepeticoes] = useState(3)
+  const [repeticoes, setRepeticoes] = useState(2)
   const [maxPulos, setMaxPulos] = useState(10)
   const [minPct, setMinPct] = useState(70)
   const [gale, setGale] = useState(1)
@@ -222,6 +222,13 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
       <h2 style={{ margin: '0 0 20px 0', color: azul, fontSize: '18px' }}>Buscador de Padroes</h2>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+        <div>
+          <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>PADROES SEGUIDOS</label>
+          <select value={repeticoes} onChange={e => setRepeticoes(parseInt(e.target.value))}
+            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
+            {[2, 3, 4, 5].map(n => <option key={n} value={n}>{n}x seguidos</option>)}
+          </select>
+        </div>
         <div>
           <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MERCADO</label>
           <select value={mercado} onChange={e => setMercado(e.target.value)}
