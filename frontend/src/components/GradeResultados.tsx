@@ -60,8 +60,9 @@ function calcularIA(linhas: Partida[], colunas: string[], tipoIA: number, filtro
   const resultado: Tendencia[] = []
   const temFiltro = Object.values(filtroAtivo).some(v => v !== '')
   const qtd = tipoIA === 1 ? 2 : tipoIA === 2 ? 3 : 4
-  const linhasComp = linhas.slice(0, qtd)
-  const linhasHist = linhas.slice(0, Math.min(linhas.length, 48))
+  // Ignora linha 0 (hora atual ainda em andamento) - analisa a partir da linha 1
+  const linhasComp = linhas.slice(1, 1 + qtd)
+  const linhasHist = linhas.slice(1, Math.min(linhas.length, 49))
 
   const histMap: Record<string, (PlacarInfo | null)[]> = {}
   colunas.forEach(col => { histMap[col] = linhasHist.map(l => extrairPlacar(l[col] as string)) })
@@ -447,25 +448,27 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     }
   }, [linhas, colunas])
 
+  // So mostrar entradas de minutos que ainda vao acontecer na hora atual
   const melhores = tendencias
-    .filter(t => t.probabilidade >= 65 && t.confianca >= 65)
-    .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
-    .slice(0, 5)
-
-  // Alerta automatico da IA - quando melhores muda e tem entrada forte, pisca e emite som
-  const melhoresKey = melhores.map(m => m.minuto + m.mercado).join(',')
-  useMemo(() => {
-    if (!mostrarIA || melhores.length === 0) return
-    // Marcar automaticamente os MINs das melhores entradas
-    const cols_melhores = melhores.map(m => 'tempo' + m.minuto.padStart(2, '0'))
-    setEntradasMarcadas(prev => {
-      // So adiciona se ainda nao estiver marcado (nao sobrescreve selecao manual)
-      const novos = cols_melhores.filter(c => !prev.includes(c))
-      if (novos.length === 0) return prev
-      if (alertaSom) tocarAlerta()
-      return [...prev, ...novos]
+    .filter(t => {
+      const minNum = parseInt(t.minuto)
+      return minNum > minAtualBet && t.probabilidade >= 65 && t.confianca >= 65
     })
-  }, [melhoresKey, mostrarIA])
+    .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
+    .slice(0, 3)
+
+  // Alerta automatico da IA - so dispara quando ha entrada FORTE (prob >= 75 e conf >= 75)
+  // Usa useEffect para nao causar re-renders infinitos
+  const melhoresFortes = melhores.filter(t => t.probabilidade >= 75 && t.confianca >= 75)
+  const melhoresKey = melhoresFortes.map(m => m.minuto + m.mercado).join(',')
+
+  useMemo(() => {
+    if (!mostrarIA || melhoresFortes.length === 0 || !melhoresKey) return
+    const colsMelhores = melhoresFortes.map(m => 'tempo' + m.minuto.padStart(2, '0'))
+    // Substitui completamente as entradas da IA (nao acumula)
+    setEntradasMarcadas(colsMelhores)
+    if (alertaSom) tocarAlerta()
+  }, [melhoresKey])
 
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
