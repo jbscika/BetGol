@@ -262,6 +262,7 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const [agora, setAgora] = useState(new Date())
   const [entradaMarcada, setEntradaMarcada] = useState<{ col: string; texto: string } | null>(null)
   const [piscando, setPiscando] = useState(false)
+  const [placarSelecionado, setPlacarSelecionado] = useState<string | null>(null)
   const intervaloAlertaRef = useState<any>(null)
 
   // Timer do relogio
@@ -277,15 +278,17 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     return () => clearInterval(t)
   }, [entradaMarcada])
 
-  function marcarEntrada(col: string, texto: string) {
-    if (entradaMarcada?.col === col && entradaMarcada?.texto === texto) {
-      // segundo clique = confirmar entrada, para o alerta
+  function togglePlacar(texto: string) {
+    setPlacarSelecionado(prev => prev === texto ? null : texto)
+  }
+
+  function marcarEntrada(col: string) {
+    if (entradaMarcada?.col === col) {
       setEntradaMarcada(null)
       setPiscando(false)
       tocarConfirmacao()
     } else {
-      // primeiro clique = marcar entrada
-      setEntradaMarcada({ col, texto })
+      setEntradaMarcada({ col, texto: col.replace('tempo', '') })
       tocarAlertaEntrada()
     }
   }
@@ -444,12 +447,6 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     .filter(t => t.probabilidade >= 65 && t.confianca >= 65)
     .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
     .slice(0, 5)
-
-  const [placarSelecionado, setPlacarSelecionado] = useState<string | null>(null)
-
-  function togglePlacar(texto: string) {
-    setPlacarSelecionado(prev => prev === texto ? null : texto)
-  }
 
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
@@ -638,9 +635,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         <div style={{ background: piscando ? '#2a1500' : '#1a1000', border: '2px solid #ff9800', borderRadius: '8px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', transition: 'background 0.3s' }}>
           <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: piscando ? '#ff9800' : 'transparent', border: '2px solid #ff9800', transition: 'background 0.3s' }} />
           <span style={{ fontSize: '10px', color: '#ff9800', fontWeight: 700, letterSpacing: '2px' }}>ENTRADA MARCADA</span>
-          <span style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{entradaMarcada.texto}</span>
-          <span style={{ fontSize: '10px', color: '#ff9800' }}>MIN {entradaMarcada.col.replace('tempo', '')}</span>
-          <span style={{ fontSize: '9px', color: '#ffffff88' }}>clique novamente na celula para confirmar entrada</span>
+          <span style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>MIN {entradaMarcada.col.replace('tempo', '')}</span>
+          <span style={{ fontSize: '9px', color: '#ffffff88' }}>duplo clique no MIN novamente para confirmar</span>
           <button onClick={() => { setEntradaMarcada(null); setPiscando(false) }}
             style={{ marginLeft: 'auto', background: 'none', border: '1px solid #ff9800', color: '#ff9800', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit', fontWeight: 700 }}>
             CANCELAR
@@ -689,11 +685,23 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
 
             <tr>
               <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px 5px', color: '#ffffff', fontSize: '8px', position: 'sticky', left: 0, zIndex: 3 }}>MIN</th>
-              {cols.map(col => (
-                <th key={col} style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: '#ffffff', fontSize: '9px', textAlign: 'center' }}>
-                  {col.replace('tempo', '')}
-                </th>
-              ))}
+              {cols.map(col => {
+                const isEntradaCol = entradaMarcada?.col === col
+                return (
+                  <th key={col}
+                    onDoubleClick={() => marcarEntrada(col)}
+                    title="Duplo clique para marcar entrada"
+                    style={{
+                      background: isEntradaCol ? (piscando ? '#ff6600' : '#cc4400') : C.surface2,
+                      border: `1px solid ${isEntradaCol ? '#ff9800' : C.border}`,
+                      padding: '3px', color: isEntradaCol ? '#ffffff' : '#ffffff',
+                      fontSize: '9px', textAlign: 'center', cursor: 'pointer',
+                      transition: 'background 0.3s',
+                    }}>
+                    {col.replace('tempo', '')}
+                  </th>
+                )
+              })}
               <th style={{ background: C.surface2, border: `1px solid ${C.border}`, padding: '3px', color: '#ffffff', fontSize: '9px', textAlign: 'center' }}>% | G</th>
             </tr>
           </thead>
@@ -709,21 +717,21 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     const isSelecionado = p !== null && placarSelecionado === p.texto
-                    const isEntrada = p !== null && entradaMarcada?.col === col && entradaMarcada?.texto === p.texto
+                    const isEntradaCol = entradaMarcada?.col === col
                     const bgColor = !p ? C.bg
-                      : isEntrada ? '#ff6600'
                       : isSelecionado ? '#ff9800'
+                      : isEntradaCol ? (piscando ? '#2a1000' : '#1a0800')
                       : temFiltro ? (isGreen ? '#006400' : '#6b0000')
                       : '#6b0000'
                     return (
                       <td key={col}
-                        className={isEntrada ? 'celula-alerta' : ''}
-                        onClick={() => {
-                          if (!p) return
-                          if (placarSelecionado !== null) togglePlacar(p.texto)
-                          else marcarEntrada(col, p.texto)
-                        }}
-                        style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bgColor, cursor: p ? 'pointer' : 'default' }}>
+                        onClick={() => p && togglePlacar(p.texto)}
+                        style={{
+                          padding: '0', border: `1px solid ${isEntradaCol ? '#ff9800' : C.border}`,
+                          textAlign: 'center', height: '20px', background: bgColor,
+                          cursor: p ? 'pointer' : 'default',
+                          transition: 'background 0.3s',
+                        }}>
                         {p ? (
                           <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color: '#ffffff', textAlign: 'center' }}>
                             {p.texto}
