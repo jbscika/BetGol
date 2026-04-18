@@ -392,6 +392,12 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
     .sort((a, b) => (b.probabilidade + b.confianca) - (a.probabilidade + a.confianca))
     .slice(0, 5)
 
+  const [placarSelecionado, setPlacarSelecionado] = useState<string | null>(null)
+
+  function togglePlacar(texto: string) {
+    setPlacarSelecionado(prev => prev === texto ? null : texto)
+  }
+
   function aplicar() { setFiltrosAtivos({ ...filtros }) }
   function limpar() { setFiltros({ ...FILTRO_VAZIO }); setFiltrosAtivos({ ...FILTRO_VAZIO }) }
   function setFiltroAuto(novoFiltro: typeof FILTRO_VAZIO) { setFiltros(novoFiltro); setFiltrosAtivos(novoFiltro) }
@@ -632,14 +638,20 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                   {cols.map(col => {
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
-                    const bgColor = !p ? C.bg : isGreen ? '#006400' : p.over25 ? '#004d1a' : '#6b0000'
+                    const isSelecionado = p !== null && placarSelecionado === p.texto
+                    // Sem filtro: tudo vermelho. Com filtro: verde se passa, vermelho se nao passa
+                    const bgColor = !p ? C.bg
+                      : isSelecionado ? '#ff9800'
+                      : temFiltro ? (isGreen ? '#006400' : '#6b0000')
+                      : '#6b0000'
                     return (
-                      <td key={col} style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bgColor }}>
+                      <td key={col} onClick={() => p && togglePlacar(p.texto)}
+                        style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bgColor, cursor: p ? 'pointer' : 'default' }}>
                         {p ? (
                           <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color: '#ffffff', textAlign: 'center' }}>
                             {p.texto}
                           </span>
-                        ) : <span style={{ color: '#ffffff' + '44', fontSize: '9px' }}>-</span>}
+                        ) : <span style={{ color: '#ffffff44', fontSize: '9px' }}>-</span>}
                       </td>
                     )
                   })}
@@ -653,6 +665,16 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
           </tbody>
         </table>
       </div>
+
+      {/* PLACAR SELECIONADO */}
+      {placarSelecionado && (
+        <div style={{ background: '#1a1000', border: '1px solid #ff9800', borderRadius: '6px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '9px', color: '#ff9800', fontWeight: 700, letterSpacing: '1px' }}>PLACAR SELECIONADO</span>
+          <span style={{ fontSize: '14px', fontWeight: 800, color: '#ffffff' }}>{placarSelecionado}</span>
+          <span style={{ fontSize: '9px', color: '#ff9800' }}>- todos os {placarSelecionado} destacados em laranja</span>
+          <button onClick={() => setPlacarSelecionado(null)} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #ff9800', color: '#ff9800', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>LIMPAR</button>
+        </div>
+      )}
 
       {/* LEGENDA */}
       {mostrarIA && (
