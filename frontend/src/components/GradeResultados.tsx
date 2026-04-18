@@ -260,12 +260,65 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
   const [painelAtivo, setPainelAtivo] = useState<'casa' | 'fora' | 'gols'>('casa')
   const [alertaSom, setAlertaSom] = useState(true)
   const [agora, setAgora] = useState(new Date())
+  const [entradaMarcada, setEntradaMarcada] = useState<{ col: string; texto: string } | null>(null)
+  const [piscando, setPiscando] = useState(false)
+  const intervaloAlertaRef = useState<any>(null)
 
-  // Timer correto com useEffect
+  // Timer do relogio
   useMemo(() => {
     const timer = setInterval(() => setAgora(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  // Piscar a celula marcada
+  useMemo(() => {
+    if (!entradaMarcada) { setPiscando(false); return }
+    const t = setInterval(() => setPiscando(p => !p), 500)
+    return () => clearInterval(t)
+  }, [entradaMarcada])
+
+  function marcarEntrada(col: string, texto: string) {
+    if (entradaMarcada?.col === col && entradaMarcada?.texto === texto) {
+      // segundo clique = confirmar entrada, para o alerta
+      setEntradaMarcada(null)
+      setPiscando(false)
+      tocarConfirmacao()
+    } else {
+      // primeiro clique = marcar entrada
+      setEntradaMarcada({ col, texto })
+      tocarAlertaEntrada()
+    }
+  }
+
+  function tocarAlertaEntrada() {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      // Toca 3 bipes rapidos
+      for (let i = 0; i < 3; i++) {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = 1200
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.2)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.2 + 0.15)
+        osc.start(ctx.currentTime + i * 0.2)
+        osc.stop(ctx.currentTime + i * 0.2 + 0.15)
+      }
+    } catch (e) {}
+  }
+
+  function tocarConfirmacao() {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.frequency.value = 600
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.4)
+    } catch (e) {}
+  }
 
   const horaBet365 = horas && horas.length > 0 ? parseInt(String(horas[0])) : agora.getHours()
   const temFiltro = Object.values(filtrosAtivos).some(v => v !== '')
@@ -468,6 +521,8 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: #0a0e1a; }
         ::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 2px; }
+        @keyframes piscar { 0%,100%{opacity:1;box-shadow:0 0 8px #ff9800} 50%{opacity:0.3;box-shadow:none} }
+        .celula-alerta { animation: piscar 0.5s ease-in-out infinite !important; }
       `}</style>
 
       {/* STATS + LIGAS + IA */}
@@ -578,6 +633,21 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
         </div>
       </div>
 
+      {/* ENTRADA MARCADA */}
+      {entradaMarcada && (
+        <div style={{ background: piscando ? '#2a1500' : '#1a1000', border: '2px solid #ff9800', borderRadius: '8px', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '12px', transition: 'background 0.3s' }}>
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: piscando ? '#ff9800' : 'transparent', border: '2px solid #ff9800', transition: 'background 0.3s' }} />
+          <span style={{ fontSize: '10px', color: '#ff9800', fontWeight: 700, letterSpacing: '2px' }}>ENTRADA MARCADA</span>
+          <span style={{ fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{entradaMarcada.texto}</span>
+          <span style={{ fontSize: '10px', color: '#ff9800' }}>MIN {entradaMarcada.col.replace('tempo', '')}</span>
+          <span style={{ fontSize: '9px', color: '#ffffff88' }}>clique novamente na celula para confirmar entrada</span>
+          <button onClick={() => { setEntradaMarcada(null); setPiscando(false) }}
+            style={{ marginLeft: 'auto', background: 'none', border: '1px solid #ff9800', color: '#ff9800', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit', fontWeight: 700 }}>
+            CANCELAR
+          </button>
+        </div>
+      )}
+
       {/* GRADE PRINCIPAL */}
       <div style={{ overflowX: 'auto', width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: '8px' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '11px', width: '100%' }}>
@@ -639,13 +709,20 @@ export default function GradeResultados({ linhas, colunas, horas, liga, ligas, o
                     const p = extrairPlacar(linha[col] as string)
                     const isGreen = p !== null && temFiltro && passaFiltro(p, filtrosAtivos)
                     const isSelecionado = p !== null && placarSelecionado === p.texto
-                    // Sem filtro: tudo vermelho. Com filtro: verde se passa, vermelho se nao passa
+                    const isEntrada = p !== null && entradaMarcada?.col === col && entradaMarcada?.texto === p.texto
                     const bgColor = !p ? C.bg
+                      : isEntrada ? '#ff6600'
                       : isSelecionado ? '#ff9800'
                       : temFiltro ? (isGreen ? '#006400' : '#6b0000')
                       : '#6b0000'
                     return (
-                      <td key={col} onClick={() => p && togglePlacar(p.texto)}
+                      <td key={col}
+                        className={isEntrada ? 'celula-alerta' : ''}
+                        onClick={() => {
+                          if (!p) return
+                          if (placarSelecionado !== null) togglePlacar(p.texto)
+                          else marcarEntrada(col, p.texto)
+                        }}
                         style={{ padding: '0', border: `1px solid ${C.border}`, textAlign: 'center', height: '20px', background: bgColor, cursor: p ? 'pointer' : 'default' }}>
                         {p ? (
                           <span style={{ display: 'block', width: '100%', lineHeight: '20px', fontWeight: 700, fontSize: '10px', color: '#ffffff', textAlign: 'center' }}>
