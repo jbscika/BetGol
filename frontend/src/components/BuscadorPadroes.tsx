@@ -19,6 +19,7 @@ interface Resultado {
   reds: number
   pct: number
   pctRecente: number
+  confirmado: boolean
   liga: string
 }
 
@@ -148,12 +149,16 @@ function buscarPadroes(
       const recentes = ocorrencias.slice(0, Math.min(5, entradas))
       const pctRecente = Math.round(recentes.filter(o => o.acertou).length / recentes.length * 100)
 
+      // Confirmacao: ultimas 3 ocorrencias - padrao ainda ativo?
+      const ultimas3 = ocorrencias.slice(0, Math.min(3, entradas))
+      const confirmado = ultimas3.filter(o => o.acertou).length >= Math.ceil(ultimas3.length * 0.67)
+
       resultados.push({
         padrao: ultimoPadrao,
         minuto: col.replace('tempo', ''),
         pulos,
         minutoEntrada: colAlvo.replace('tempo', ''),
-        entradas, greens, reds, pct, pctRecente, liga,
+        entradas, greens, reds, pct, pctRecente, confirmado, liga,
       })
     }
   }
@@ -171,7 +176,7 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
   const [maxPulos, setMaxPulos] = useState(10)
   const [minPct, setMinPct] = useState(70)
   const [gale, setGale] = useState(1)
-  const [horas, setHoras] = useState(24)
+  const [horas, setHoras] = useState(48)
   const [ligasSelecionadas, setLigasSelecionadas] = useState<string[]>(ligas || [])
   const [buscando, setBuscando] = useState(false)
   const [resultados, setResultados] = useState<Resultado[]>([])
@@ -204,6 +209,8 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
       }
 
       todos.sort((a, b) => {
+        // Confirmados primeiro, depois por score
+        if (a.confirmado !== b.confirmado) return a.confirmado ? -1 : 1
         const sA = a.pct * 0.6 + a.pctRecente * 0.4
         const sB = b.pct * 0.6 + b.pctRecente * 0.4
         return sB - sA || b.entradas - a.entradas
@@ -301,14 +308,14 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ background: azul, color: '#fff' }}>
-                  {['PADRAO','MIN PADRAO','PULOS','MIN ENTRADA','LIGA','ENTRADAS','GREENS','REDS','%','RECENTE'].map(h => (
+                  {['PADRAO','MIN PADRAO','PULOS','MIN ENTRADA','LIGA','ENTRADAS','GREENS','REDS','%','RECENTE','STATUS'].map(h => (
                     <th key={h} style={{ padding: '10px', textAlign: h === 'PADRAO' ? 'left' : 'center' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {resultados.map((r, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee' }}>
+                  <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee', borderLeft: r.confirmado ? '3px solid #1a7a3a' : '3px solid transparent' }}>
                     <td style={{ padding: '10px', fontWeight: 700, color: azul }}>{r.padrao}</td>
                     <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700 }}>{r.minuto}</td>
                     <td style={{ padding: '10px', textAlign: 'center' }}>{r.pulos}</td>
