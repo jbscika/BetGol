@@ -220,131 +220,150 @@ export default function BuscadorPadroes({ linhas, colunas, liga, ligas, dadosTod
     }, 100)
   }
 
-  const verde = '#1a7a3a'
-  const azul = '#1565c0'
-  const vermelho = '#c0392b'
+  const C = {
+    bg: '#0a0e1a', surface: '#0f1629', surface2: '#141d35',
+    border: '#1e2d4a', accent: '#00d4ff', green: '#00e676',
+    red: '#ff3d5a', yellow: '#ffd600', text: '#ffffff',
+    textDim: '#8aa0c0', purple: '#ce93d8',
+  }
 
   return (
-    <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #ddd', padding: '24px' }}>
-      <h2 style={{ margin: '0 0 20px 0', color: azul, fontSize: '18px' }}>Buscador de Padroes</h2>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '12px', overflow: 'hidden', fontFamily: "'JetBrains Mono', monospace" }}>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>PADROES SEGUIDOS</label>
-          <select value={repeticoes} onChange={e => setRepeticoes(parseInt(e.target.value))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-            {[2, 3, 4, 5].map(n => <option key={n} value={n}>{n}x seguidos</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MERCADO</label>
-          <select value={mercado} onChange={e => setMercado(e.target.value)}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-            {MERCADOS.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MAX PULOS</label>
-          <select value={maxPulos} onChange={e => setMaxPulos(parseInt(e.target.value))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-            {[5, 10, 15, 20, 30, 40, 50, 60].map(n => <option key={n} value={n}>{n} pulos</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>GALE</label>
-          <select value={gale} onChange={e => setGale(parseInt(e.target.value))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-            {GALES.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>MAX HORAS</label>
-          <select value={horas} onChange={e => setHoras(parseInt(e.target.value))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-            {HORAS_OPCOES.map(h => <option key={h.value} value={h.value}>{h.label}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '4px' }}>% MINIMO</label>
-          <select value={minPct} onChange={e => setMinPct(parseInt(e.target.value))}
-            style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}>
-            {[70, 75, 80, 85, 90, 95, 100].map(n => <option key={n} value={n}>{n}%</option>)}
-          </select>
-        </div>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');`}</style>
+
+      {/* HEADER */}
+      <div style={{ background: `linear-gradient(135deg, #0f1629 0%, #1a2540 100%)`, padding: '16px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
+        <span style={{ fontSize: '13px', fontWeight: 800, color: C.text, letterSpacing: '2px' }}>BUSCADOR DE PADROES</span>
+        {resultados.length > 0 && (
+          <span style={{ marginLeft: 'auto', fontSize: '10px', background: C.accent + '22', color: C.accent, border: `1px solid ${C.accent}44`, borderRadius: '4px', padding: '2px 8px', fontWeight: 700 }}>
+            {resultados.length} padroes
+          </span>
+        )}
       </div>
 
-      <div style={{ marginBottom: '16px' }}>
-        <label style={{ fontSize: '11px', fontWeight: 700, color: '#666', display: 'block', marginBottom: '8px' }}>LIGAS</label>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {ligas?.map(l => (
-            <button key={l} onClick={() => toggleLiga(l)} style={{
-              padding: '6px 12px', borderRadius: '20px', border: 'none',
-              background: ligasSelecionadas.includes(l) ? azul : '#e0e0e0',
-              color: ligasSelecionadas.includes(l) ? '#fff' : '#333',
-              fontWeight: 700, fontSize: '11px', cursor: 'pointer',
-            }}>
-              {l.split(' ')[0].toUpperCase()}
-            </button>
+      <div style={{ padding: '16px 20px' }}>
+
+        {/* FILTROS GRID */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+          {[
+            { label: 'PADROES', value: repeticoes, onChange: (v: string) => setRepeticoes(parseInt(v)), opts: [2,3,4,5].map(n => ({ v: n, l: n + 'x seguidos' })) },
+            { label: 'MERCADO', value: mercado, onChange: (v: string) => setMercado(v), opts: MERCADOS.map(m => ({ v: m, l: m })) },
+            { label: 'MAX PULOS', value: maxPulos, onChange: (v: string) => setMaxPulos(parseInt(v)), opts: [5,10,15,20,30,40,50,60].map(n => ({ v: n, l: n + ' pulos' })) },
+            { label: 'GALE', value: gale, onChange: (v: string) => setGale(parseInt(v)), opts: GALES.map(g => ({ v: g.value, l: g.label })) },
+            { label: 'MAX HORAS', value: horas, onChange: (v: string) => setHoras(parseInt(v)), opts: HORAS_OPCOES.map(h => ({ v: h.value, l: h.label })) },
+            { label: '% MINIMO', value: minPct, onChange: (v: string) => setMinPct(parseInt(v)), opts: [70,75,80,85,90,95,100].map(n => ({ v: n, l: n + '%' })) },
+          ].map(f => (
+            <div key={f.label}>
+              <div style={{ fontSize: '8px', color: C.accent, fontWeight: 700, letterSpacing: '1.5px', marginBottom: '5px' }}>{f.label}</div>
+              <select value={f.value} onChange={e => f.onChange(e.target.value)} style={{
+                width: '100%', padding: '8px 10px',
+                background: C.surface2, border: `1px solid ${C.border}`,
+                borderRadius: '6px', color: C.text,
+                fontSize: '11px', fontFamily: 'inherit', outline: 'none',
+                cursor: 'pointer',
+              }}>
+                {f.opts.map((o: any) => <option key={o.v} value={o.v} style={{ background: C.surface2 }}>{o.l}</option>)}
+              </select>
+            </div>
           ))}
         </div>
-      </div>
 
-      <button onClick={buscar} disabled={buscando} style={{
-        width: '100%', padding: '12px', background: verde, color: '#fff',
-        border: 'none', borderRadius: '8px', fontWeight: 800,
-        fontSize: '14px', cursor: buscando ? 'not-allowed' : 'pointer',
-        marginBottom: '20px', letterSpacing: '1px', opacity: buscando ? 0.7 : 1,
-      }}>
-        {buscando ? 'Buscando padroes...' : 'BUSCAR PADROES'}
-      </button>
-
-      {resultados.length > 0 && (
-        <div>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: '#666', marginBottom: '10px' }}>
-            {resultados.length} padroes encontrados
-            {gale > 1 && <span style={{ marginLeft: '8px', color: azul }}>({gale === 2 ? '1 gale' : '2 gales'})</span>}
+        {/* LIGAS */}
+        <div style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '8px', color: C.accent, fontWeight: 700, letterSpacing: '1.5px', marginBottom: '8px' }}>LIGAS</div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {ligas?.map(l => (
+              <button key={l} onClick={() => toggleLiga(l)} style={{
+                padding: '5px 12px', borderRadius: '20px',
+                border: `1px solid ${ligasSelecionadas.includes(l) ? C.accent : C.border}`,
+                background: ligasSelecionadas.includes(l) ? C.accent + '22' : 'transparent',
+                color: ligasSelecionadas.includes(l) ? C.accent : C.textDim,
+                fontWeight: 700, fontSize: '10px', cursor: 'pointer',
+                fontFamily: 'inherit', letterSpacing: '1px',
+                transition: 'all 0.15s',
+              }}>
+                {l.split(' ')[0].toUpperCase()}
+              </button>
+            ))}
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-              <thead>
-                <tr style={{ background: azul, color: '#fff' }}>
-                  {['PADRAO','MIN PADRAO','PULOS','MIN ENTRADA','LIGA','ENTRADAS','GREENS','REDS','%','RECENTE','STATUS'].map(h => (
-                    <th key={h} style={{ padding: '10px', textAlign: h === 'PADRAO' ? 'left' : 'center' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {resultados.map((r, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#f8f8f8' : '#fff', borderBottom: '1px solid #eee', borderLeft: r.confirmado ? '3px solid #1a7a3a' : '3px solid transparent' }}>
-                    <td style={{ padding: '10px', fontWeight: 700, color: azul }}>{r.padrao}</td>
-                    <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700 }}>{r.minuto}</td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>{r.pulos}</td>
-                    <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, color: verde }}>{r.minutoEntrada}</td>
-                    <td style={{ padding: '10px', textAlign: 'center', fontSize: '11px', color: '#666' }}>{r.liga.split(' ')[0]}</td>
-                    <td style={{ padding: '10px', textAlign: 'center' }}>{r.entradas}</td>
-                    <td style={{ padding: '10px', textAlign: 'center', color: verde, fontWeight: 700 }}>{r.greens}</td>
-                    <td style={{ padding: '10px', textAlign: 'center', color: vermelho, fontWeight: 700 }}>{r.reds}</td>
-                    <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, fontSize: '14px',
-                      color: r.pct >= 95 ? verde : r.pct >= 90 ? '#b8960c' : vermelho }}>
-                      {r.pct}%
-                    </td>
-                    <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, fontSize: '12px',
-                      color: r.pctRecente >= 80 ? verde : r.pctRecente >= 60 ? '#b8960c' : vermelho }}>
-                      {r.pctRecente}%
-                    </td>
+        </div>
+
+        {/* BOTAO BUSCAR */}
+        <button onClick={buscar} disabled={buscando} style={{
+          width: '100%', padding: '12px',
+          background: buscando ? C.surface2 : `linear-gradient(135deg, #00c853, #00e676)`,
+          color: buscando ? C.textDim : '#0a0e1a',
+          border: `1px solid ${buscando ? C.border : C.green}`,
+          borderRadius: '8px', fontWeight: 800, fontSize: '12px',
+          cursor: buscando ? 'not-allowed' : 'pointer',
+          letterSpacing: '2px', fontFamily: 'inherit',
+          opacity: buscando ? 0.7 : 1, transition: 'all 0.2s',
+        }}>
+          {buscando ? 'ANALISANDO...' : 'BUSCAR PADROES'}
+        </button>
+
+        {/* RESULTADOS */}
+        {resultados.length > 0 && (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{ fontSize: '9px', color: C.textDim, marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>{resultados.length} padroes encontrados</span>
+              {gale > 1 && <span style={{ color: C.yellow }}>{gale === 2 ? '1 gale' : '2 gales'}</span>}
+              <span style={{ marginLeft: 'auto', color: C.green }}>verde borda = ATIVO</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <thead>
+                  <tr style={{ background: C.surface2 }}>
+                    {['PADRAO','MIN','PULOS','ENTRADA','LIGA','ENT','GREEN','RED','%','REC','STATUS'].map(h => (
+                      <th key={h} style={{ padding: '8px 6px', textAlign: 'center', color: C.accent, fontSize: '8px', letterSpacing: '1px', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {resultados.map((r, i) => (
+                    <tr key={i} style={{
+                      background: i % 2 === 0 ? C.surface2 : C.bg,
+                      borderBottom: `1px solid ${C.border}`,
+                      borderLeft: r.confirmado ? `3px solid ${C.green}` : `3px solid transparent`,
+                    }}>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, color: C.accent }}>{r.padrao}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 700, color: C.text }}>{r.minuto}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', color: C.textDim }}>{r.pulos}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, color: C.green }}>{r.minutoEntrada}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '9px', color: C.purple }}>{r.liga.split(' ')[0]}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', color: C.textDim }}>{r.entradas}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', color: C.green, fontWeight: 700 }}>{r.greens}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', color: C.red, fontWeight: 700 }}>{r.reds}</td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 800, fontSize: '13px',
+                        color: r.pct >= 95 ? C.green : r.pct >= 85 ? C.yellow : C.red }}>
+                        {r.pct}%
+                      </td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center', fontWeight: 700,
+                        color: r.pctRecente >= 80 ? C.green : r.pctRecente >= 60 ? C.yellow : C.red }}>
+                        {r.pctRecente}%
+                      </td>
+                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                        {r.confirmado
+                          ? <span style={{ background: C.green + '22', color: C.green, border: `1px solid ${C.green}44`, borderRadius: '4px', padding: '2px 6px', fontSize: '8px', fontWeight: 700 }}>ATIVO</span>
+                          : <span style={{ background: C.red + '22', color: C.red, border: `1px solid ${C.red}44`, borderRadius: '4px', padding: '2px 6px', fontSize: '8px', fontWeight: 700 }}>FRIO</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {resultados.length === 0 && !buscando && (
-        <div style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
-          Configure os filtros e clique em Buscar para encontrar padroes
-        </div>
-      )}
+        {resultados.length === 0 && !buscando && (
+          <div style={{ textAlign: 'center', padding: '30px', color: C.textDim, fontSize: '11px', marginTop: '8px' }}>
+            Configure os filtros e clique em Buscar
+          </div>
+        )}
+      </div>
     </div>
   )
-}
+        }
