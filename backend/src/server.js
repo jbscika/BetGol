@@ -7,6 +7,7 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
 const ANALISETIPS_TOKEN = process.env.ANALISETIPS_TOKEN;
+const ANALISETIPS_COOKIE = process.env.ANALISETIPS_COOKIE;
 
 const LIGAS_MAP = {
   'Copa do Mundo':            'copa',
@@ -17,22 +18,42 @@ const LIGAS_MAP = {
 };
 
 app.get('/', (req, res) => {
-  res.json({ status: 'BetGol API Online', versao: '7.0 - AnaliseTips + Firebase' });
+  res.json({ status: 'BetGol API Online', versao: '8.0 - AnaliseTips + Firebase' });
 });
 
 async function buscarAnaliseTips(league, rows = 720) {
   try {
     const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${league}&page=1&rows=${rows}&method=resultsBoth`;
-    const resp = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${ANALISETIPS_TOKEN}`,
-        'Accept': '*/*',
-        'Origin': 'https://www.analisetips.com',
-        'Referer': 'https://www.analisetips.com/',
-      },
-    });
+
+    const headers = {
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'pt-BR,pt;q=0.9',
+      'Origin': 'https://www.analisetips.com',
+      'Referer': 'https://www.analisetips.com/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    };
+
+    // Usa Bearer token se disponivel, senao usa cookie
+    if (ANALISETIPS_TOKEN) {
+      headers['Authorization'] = `Bearer ${ANALISETIPS_TOKEN}`;
+    }
+    if (ANALISETIPS_COOKIE) {
+      headers['Cookie'] = ANALISETIPS_COOKIE;
+      headers['X-XSRF-TOKEN'] = ANALISETIPS_COOKIE.split('XSRF-TOKEN=')[1]?.split(';')[0] || '';
+    }
+
+    const resp = await fetch(url, { headers });
+
+    if (!resp.ok) {
+      console.error(`AnaliseTips retornou ${resp.status} para ${league}`);
+      return null;
+    }
+
     const json = await resp.json();
-    if (json.error) return null;
+    if (json.error) {
+      console.error(`AnaliseTips erro para ${league}:`, json.message || json.error);
+      return null;
+    }
     return json.data;
   } catch (e) {
     console.error(`Erro ao buscar AnaliseTips (${league}):`, e.message);
@@ -41,7 +62,7 @@ async function buscarAnaliseTips(league, rows = 720) {
 }
 
 // =========================================================================
-// ROTA: /resultados — busca AnaliseTips direto (rota principal do frontend)
+// ROTA: /resultados
 // =========================================================================
 app.get('/resultados', async (req, res) => {
   try {
@@ -68,7 +89,7 @@ app.get('/resultados', async (req, res) => {
 });
 
 // =========================================================================
-// ROTA: /resultados-locais — Firebase com fallback AnaliseTips
+// ROTA: /resultados-locais
 // =========================================================================
 app.get('/resultados-locais', async (req, res) => {
   try {
@@ -116,7 +137,6 @@ app.get('/resultados-locais', async (req, res) => {
       return res.json(linhas);
     }
 
-    // Fallback AnaliseTips
     if (leagueId) {
       console.log(`[ANALISETIPS fallback] Buscando ${ligaPedida}...`);
       const dados = await buscarAnaliseTips(leagueId);
