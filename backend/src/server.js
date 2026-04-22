@@ -33,13 +33,18 @@ async function buscarAnaliseTips(league, rows = 720) {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     };
 
-    // Usa Bearer token se disponivel, senao usa cookie
     if (ANALISETIPS_TOKEN) {
       headers['Authorization'] = `Bearer ${ANALISETIPS_TOKEN}`;
     }
+
     if (ANALISETIPS_COOKIE) {
       headers['Cookie'] = ANALISETIPS_COOKIE;
-      headers['X-XSRF-TOKEN'] = ANALISETIPS_COOKIE.split('XSRF-TOKEN=')[1]?.split(';')[0] || '';
+      // Extrair XSRF-TOKEN do cookie e enviar separado
+      const xsrfMatch = ANALISETIPS_COOKIE.match(/XSRF-TOKEN=([^;]+)/);
+      if (xsrfMatch) {
+        // Decodificar o valor do XSRF-TOKEN
+        headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfMatch[1]);
+      }
     }
 
     const resp = await fetch(url, { headers });
