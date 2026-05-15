@@ -1,10 +1,19 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { db } = require('./firebase');
+const admin = require('firebase-admin');
+const fetch = require('node-fetch');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Inicialização do Firebase usando a variável de ambiente do .env
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+const db = admin.firestore();
 
 const ANALISETIPS_TOKEN = process.env.ANALISETIPS_TOKEN;
 const ANALISETIPS_COOKIE = process.env.ANALISETIPS_COOKIE;
@@ -17,11 +26,8 @@ const LIGAS_MAP = {
   'Express Cup':              'express',
 };
 
-app.get('/', (req, res) => {
-  res.json({ status: 'BetGol API Online', versao: '8.0 - AnaliseTips + Firebase' });
-});
-
-async function buscarAnaliseTips(league, rows = 720) {
+// Função que busca os dados brutos na AnaliseTips
+async function buscarAnaliseTips(league, rows = 10) {
   try {
     const url = `https://robots.analisetips.com/api/tabela?bet=365&league=${league}&page=1&rows=${rows}&method=resultsBoth`;
 
@@ -33,176 +39,94 @@ async function buscarAnaliseTips(league, rows = 720) {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     };
 
-    if (ANALISETIPS_TOKEN) {
-      headers['Authorization'] = `Bearer ${ANALISETIPS_TOKEN}`;
-    }
-
+    if (ANALISETIPS_TOKEN) headers['Authorization'] = `Bearer ${ANALISETIPS_TOKEN}`;
     if (ANALISETIPS_COOKIE) {
       headers['Cookie'] = ANALISETIPS_COOKIE;
-      // Extrair XSRF-TOKEN do cookie e enviar separado
       const xsrfMatch = ANALISETIPS_COOKIE.match(/XSRF-TOKEN=([^;]+)/);
-      if (xsrfMatch) {
-        // Decodificar o valor do XSRF-TOKEN
-        headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfMatch[1]);
-      }
+      if (xsrfMatch) headers['X-XSRF-TOKEN'] = decodeURIComponent(xsrfMatch[1]);
     }
 
     const resp = await fetch(url, { headers });
-
-    if (!resp.ok) {
-      console.error(`AnaliseTips retornou ${resp.status} para ${league}`);
-      return null;
-    }
+    if (!resp.ok) return null;
 
     const json = await resp.json();
-    if (json.error) {
-      console.error(`AnaliseTips erro para ${league}:`, json.message || json.error);
-      return null;
-    }
-    return json.data;
+    return json.error ? null : json.data;
   } catch (e) {
-    console.error(`Erro ao buscar AnaliseTips (${league}):`, e.message);
+    console.error(`❌ Erro conexao AnaliseTips (${league}):`, e.message);
     return null;
   }
 }
 
-// =========================================================================
-// ROTA: /resultados
-// =========================================================================
+// O TIMER: Essa função roda sozinha a cada 2 minutos buscando as 5 ligas
+async function rodarRoboColetor() {
+  console.log(`\n🔄 [${new Date().toLocaleTimeString()}] Iniciando varredura nas 5 ligas...`);
+
+  for (const [nomeLiga, idLiga] of Object.entries(LIGAS_MAP)) {
+    try {
+      const dados = await buscarAnaliseTips(idLiga);
+      if (!dados || !dados.linhas || dados.linhas.length === 0) {
+        continue;
+      }
+
+      // Analisa os últimos horários para pegar os novos placares
+      const linhasParaProcessar = dados.linhas.slice(0, 3);
+
+      for (const linha of linhasParaProcessar) {
+        const hora = linha.hora;
+        const dataBase = linha.data_evento_base || '00000000';
+
+        for (const chaveSlot in linha) {
+          if (chaveSlot.startsWith('tempo')) {
+            const placar = Weblinha[chaveSlot];
+            if (!placar) continue;
+
+            const minuto = chaveSlot.replace('tempo', '');
+            const id_evento = `${dataBase}-${hora}${minuto}`;
+            const docId = `${nomeLiga}-${id_evento}`;
+
+            // Salva direto no seu Firebase
+            await db.collection('partidas').doc(docId).set({
+              liga: nomeLiga,
+              id_evento: id_evento,
+              data_evento: dataBase,
+              hora: hora,
+              minuto: minuto,
+              horario: `${hora}:${minuto}`,
+              placar_real: placar,
+              [chaveSlot]: placar,
+              timestamp_resultado: Date.now()
+            }, { merge: true });
+          }
+        }
+      }
+      console.log(`✅ Liga processada: ${nomeLiga}`);
+    } catch (error) {
+      console.error(`❌ Erro na liga ${nomeLiga}:`, error.message);
+    }
+  }
+}
+
+// Ativa o loop do robô de 2 em 2 minutos
+rodarRoboColetor();
+setInterval(rodarRoboColetor, 120000);
+
+// Mantém as suas rotas antigas caso precise puxar os dados por link
+app.get('/', (req, res) => res.json({ status: 'BetGol API Online', versao: '9.0 - Auto' }));
+
 app.get('/resultados', async (req, res) => {
   try {
     const ligaPedida = req.query.liga;
     const leagueId = LIGAS_MAP[ligaPedida];
-
-    if (!leagueId) {
-      return res.status(400).json({ error: true, message: 'Liga invalida' });
-    }
-
-    console.log(`[ANALISETIPS] Buscando ${ligaPedida}...`);
+    if (!leagueId) return res.status(400).json({ error: true, message: 'Liga invalida' });
     const dados = await buscarAnaliseTips(leagueId);
-
-    if (!dados || !dados.linhas) {
-      return res.status(503).json({ error: true, message: 'AnaliseTips indisponivel' });
-    }
-
-    console.log(`[ANALISETIPS] ${ligaPedida}: ${dados.linhas.length} linhas`);
+    if (!dados || !dados.linhas) return res.status(503).json({ error: true, message: 'AnaliseTips indisponivel' });
     return res.json({ error: false, data: dados });
   } catch (erro) {
-    console.error('Erro /resultados:', erro);
     res.status(500).json({ error: true, message: 'Erro interno' });
-  }
-});
-
-// =========================================================================
-// ROTA: /resultados-locais
-// =========================================================================
-app.get('/resultados-locais', async (req, res) => {
-  try {
-    const ligaPedida = req.query.liga;
-    const leagueId = LIGAS_MAP[ligaPedida];
-
-    let query = db.collection('partidas');
-    if (ligaPedida) {
-      query = query.where('liga', '==', ligaPedida);
-    }
-    const snapshot = await query.limit(700).get();
-
-    if (!snapshot.empty && snapshot.size >= 10) {
-      const jogos = [];
-      snapshot.forEach(doc => jogos.push(doc.data()));
-
-      const linhasPorHora = {};
-      jogos.forEach(jogo => {
-        const hora = jogo.hora || (jogo.horario ? jogo.horario.split(':')[0] : null);
-        const minuto = jogo.minuto || (jogo.horario ? jogo.horario.split(':')[1] : null);
-        if (!hora || !minuto) return;
-
-        const dataBase = jogo.data_evento ? jogo.data_evento.substring(0, 8) : '00000000';
-        const chave = `${jogo.liga || ''}-${dataBase}-${hora}`;
-
-        if (!linhasPorHora[chave]) {
-          linhasPorHora[chave] = { hora, liga: jogo.liga, data_evento_base: dataBase };
-        }
-
-        const slot = `tempo${String(parseInt(minuto)).padStart(2, '0')}`;
-        if (!linhasPorHora[chave][slot]) {
-          linhasPorHora[chave][slot] = jogo.placar_real || jogo[slot] ||
-            (jogo.placares && jogo.placares.length > 0 ? jogo.placares[0].placar : null);
-        }
-      });
-
-      const linhas = Object.values(linhasPorHora);
-      linhas.sort((a, b) => {
-        const dA = (a.data_evento_base || '') + (a.hora || '');
-        const dB = (b.data_evento_base || '') + (b.hora || '');
-        return dB.localeCompare(dA);
-      });
-
-      console.log(`[FIREBASE] ${ligaPedida}: ${linhas.length} linhas`);
-      return res.json(linhas);
-    }
-
-    if (leagueId) {
-      console.log(`[ANALISETIPS fallback] Buscando ${ligaPedida}...`);
-      const dados = await buscarAnaliseTips(leagueId);
-      if (dados && dados.linhas) {
-        return res.json(dados.linhas);
-      }
-    }
-
-    return res.json([]);
-  } catch (erro) {
-    console.error('Erro ao buscar dados:', erro);
-    res.status(500).json({ erro: 'Erro interno no servidor' });
-  }
-});
-
-// =========================================================================
-// ROTA: /capturar
-// =========================================================================
-app.post('/capturar', async (req, res) => {
-  try {
-    const dados = req.body;
-    if (!dados || !dados.liga || !dados.id_evento) {
-      return res.status(400).json({ erro: 'Dados incompletos' });
-    }
-    dados.timestamp = Date.now();
-    const docId = `${dados.liga}-${dados.id_evento}`;
-    await db.collection('partidas').doc(docId).set(dados, { merge: true });
-    console.log(`[EXTENSAO] Jogo salvo: ${dados.liga} as ${dados.horario || '---'}`);
-    res.json({ sucesso: true });
-  } catch (erro) {
-    console.error('Erro ao capturar:', erro);
-    res.status(500).json({ erro: 'Erro ao salvar partida' });
-  }
-});
-
-// =========================================================================
-// ROTA: /atualizar-resultado
-// =========================================================================
-app.post('/atualizar-resultado', async (req, res) => {
-  try {
-    const { liga, id_evento, data_evento, hora, minuto, slot, placar_real } = req.body;
-    if (!liga || !id_evento || !placar_real) {
-      return res.status(400).json({ erro: 'Dados incompletos' });
-    }
-    const docId = `${liga}-${id_evento}`;
-    await db.collection('partidas').doc(docId).set({
-      liga, id_evento, data_evento, hora, minuto,
-      horario: hora && minuto ? `${hora}:${minuto}` : null,
-      placar_real,
-      [slot]: placar_real,
-      timestamp_resultado: Date.now(),
-    }, { merge: true });
-    console.log(`[RESULTADO REAL] ${liga} | ${slot} = ${placar_real}`);
-    res.json({ sucesso: true });
-  } catch (erro) {
-    console.error('Erro ao atualizar resultado:', erro);
-    res.status(500).json({ erro: 'Erro ao atualizar resultado' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`SERVIDOR BETGOL RODANDO NA PORTA ${PORT}`);
+  console.log(`🚀 SERVIDOR BETGOL AUTOMÁTICO RODANDO NA PORTA ${PORT}`);
 });
