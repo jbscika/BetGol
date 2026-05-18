@@ -33,7 +33,6 @@ function detectarColunas(partidas: Partida[]): string[] {
 }
 
 function parsearResposta(json: any): { linhas: Partida[], colunas: string[], horas: string[] } {
-  // Formato AnaliseTips: { data: { linhas, colunas, horas } }
   if (json?.data?.linhas) {
     return {
       linhas: json.data.linhas || [],
@@ -41,7 +40,6 @@ function parsearResposta(json: any): { linhas: Partida[], colunas: string[], hor
       horas: json.data.horas || [],
     }
   }
-  // Formato simples: { linhas, colunas, horas }
   if (json?.linhas) {
     return {
       linhas: json.linhas || [],
@@ -49,7 +47,6 @@ function parsearResposta(json: any): { linhas: Partida[], colunas: string[], hor
       horas: json.horas || [],
     }
   }
-  // Array direto
   if (Array.isArray(json)) {
     return { linhas: json, colunas: detectarColunas(json), horas: [] }
   }
@@ -81,7 +78,8 @@ function Dashboard() {
 
   async function buscarTodasLigas() {
     try {
-      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      // 🔥 Ajustado para bater direto na sua Hostinger com segurança máxima HTTPS
+      const API = 'https://betgol.tech'
       const resultados: Record<string, Partida[]> = {}
       await Promise.all(Object.keys(LIGAS).map(async (liga) => {
         if (liga === ligaSelecionada) return
@@ -98,7 +96,8 @@ function Dashboard() {
 
   async function buscarDadosSilencioso() {
     try {
-      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      // 🔥 Ajustado para bater direto na sua Hostinger com segurança máxima HTTPS
+      const API = 'https://betgol.tech'
       const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`)
       const json = await resp.json()
       const { linhas: l, colunas: c, horas: h } = parsearResposta(json)
@@ -116,7 +115,8 @@ function Dashboard() {
     try {
       setCarregando(true)
       setErro(null)
-      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      // 🔥 Ajustado para bater direto na sua Hostinger com segurança máxima HTTPS
+      const API = 'https://betgol.tech'
       const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`)
       const json = await resp.json()
       const { linhas: l, colunas: c, horas: h } = parsearResposta(json)
