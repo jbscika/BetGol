@@ -125,6 +125,92 @@ app.get('/resultados', async (req, res) => {
     res.status(500).json({ error: true, message: 'Erro interno' });
   }
 });
+// ==========================================
+// SISTEMA DE CONTROLE DE ACESSO (LOGIN E ADM)
+// ==========================================
+
+// Rota 1: Criar ou Atualizar Usuário (Usada pelo seu Painel de ADM)
+app.post('/api/admin/criar-usuario', async (req, res) => {
+  try {
+    const { email, password, role, expiraEmHoras } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: true, message: 'E-mail e senha são obrigatórios' });
+    }
+
+    const emailLimpo = email.toLowerCase().trim();
+    const agora = Date.now();
+    
+    // Se expiraEmHoras não for enviado, assume o padrão de 24 horas de teste
+    const horasParaExpirar = expiraEmHoras ? parseInt(expiraEmHoras) : 24;
+    const timestampExpiracao = agora + (horasParaExpirar * 60 * 60 * 1000);
+
+    // Salva o usuário em uma coleção separada chamada 'usuarios' no seu Firestore
+    await db.collection('usuarios').doc(emailLimpo).set({
+      email: emailLimpo,
+      password: password, // Em produção futura, aplicaremos hash aqui
+      role: role || 'user',
+      criadoEm: agora,
+      expiraEm: timestampExpiracao,
+      status: 'ativo'
+    }, { merge: true });
+
+    return res.json({ 
+      error: false, 
+      message: `Usuário ${emailLimpo} registrado/atualizado com sucesso! Expira em ${horasParaExpirar}h.` 
+    });
+  } catch (error) {
+    console.error('Erro ao criar usuário:', error.message);
+    return res.status(500).json({ error: true, message: 'Erro interno ao salvar usuário' });
+  }
+});
+
+// Rota 2: Autenticação (Usada pela sua Tela de Login)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: true, message: 'Preencha todos os campos' });
+    }
+
+    const emailLimpo = email.toLowerCase().trim();
+
+    // Busca o usuário direto no Firestore pelo e-mail
+    const userDoc = await db.collection('usuarios').doc(emailLimpo).get();
+
+    if (!userDoc.exists) {
+      return res.status(401).json({ error: true, message: 'E-mail ou senha incorretos' });
+    }
+
+    const usuario = userDoc.data();
+
+    // Valida a senha digitada
+    if (usuario.password !== password) {
+      return res.status(401).json({ error: true, message: 'E-mail ou senha incorretos' });
+    }
+
+    // Valida se o plano/teste já expirou (Bloqueio automático de 24h)
+    const agora = Date.now();
+    if (usuario.role !== 'admin' && agora > usuario.expiraEm) {
+      return res.status(403).json({ error: true, message: 'Seu acesso de teste de 24 horas expirou!' });
+    }
+
+    // Se passou em tudo, retorna o sucesso e o nível de acesso
+    return res.json({
+      error: false,
+      message: 'Login realizado com sucesso!',
+      user: {
+        email: usuario.email,
+        role: usuario.role,
+        expiraEm: usuario.expiraEm
+      }
+    });
+  } catch (error) {
+    console.error('Erro no login:', error.message);
+    return res.status(500).json({ error: true, message: 'Erro interno no servidor' });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
