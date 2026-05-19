@@ -14,7 +14,6 @@ function Login() {
     setCarregando(true)
     setErro(null)
 
-    // Filtro de e-mails temporários
     const dominiosBloqueados = ['yopmail.com', 'mailinator.com', '10minutemail.com', 'tempmail.com']
     const dominioUsuario = email.split('@')[1]?.toLowerCase()
 
@@ -25,13 +24,18 @@ function Login() {
     }
 
     try {
-      // 🔐 VALIDAÇÃO DIRETA DOS SEUS DADOS:
+      // 🔐 SE FOR VOCÊ (ADMINISTRADOR):
       if (email === 'jbscika@gmail.com' && senha === 'He18@894') {
-        // Salva no navegador que você está logado com sucesso
         localStorage.setItem('betgol_admin_logado', 'true')
-        
-        // Joga você direto para a tela de Admin que tinha sumido!
+        localStorage.setItem('betgol_user_logado', 'true') // Admin também pode ver área de usuário
         navigate('/admin')
+      } 
+      // 🔓 SE FOR UM USUÁRIO COMUM:
+      else if (email !== '' && senha.length >= 6) {
+        // Aqui ele aceita temporariamente o login do usuário comum para testes
+        localStorage.setItem('betgol_user_logado', 'true')
+        localStorage.setItem('betgol_admin_logado', 'false') // Não é admin
+        navigate('/') // Manda o usuário comum para a página principal do sistema
       } else {
         setErro('Usuário ou senha incorretos, ou acesso expirado.')
       }
@@ -91,6 +95,18 @@ function Login() {
             {carregando ? 'ENTRANDO...' : 'ENTRAR NO SISTEMA'}
           </button>
         </form>
+
+        {/* 📋 BOTÃO DE CADASTRE-SE ADICIONADO AQUI EMBAIXO */}
+        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#666' }}>
+          Não tem uma conta?{' '}
+          <span 
+            onClick={() => navigate('/cadastro')} 
+            style={{ color: '#1a7a3a', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Cadastre-se
+          </span>
+        </div>
+
       </div>
     </div>
   )
