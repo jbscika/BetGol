@@ -1,10 +1,14 @@
 import { useState } from 'react'
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth'
+import { useNavigate } from 'react-router-dom'
 
 function Login() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  
+  const navigate = useNavigate() // 🚀 Hook para redirecionar após o login
 
   async function LidarComLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -22,10 +26,18 @@ function Login() {
     }
 
     try {
-      // Temporário: No próximo passo vamos conectar essa chamada ao seu backend
-      console.log('Tentando logar com:', email, senha)
-      alert('Login simulado com sucesso! Próximo passo será conectar ao servidor.')
-    } catch (err) {
+      const auth = getAuth()
+      
+      // 🔥 CONEXÃO REAL COM O FIREBASE:
+      // Faz a autenticação usando o e-mail e a senha digitados
+      await signInWithEmailAndPassword(auth, email, senha)
+      
+      // Se deu certo, manda o usuário direto para o painel de administração protegido!
+      navigate('/admin')
+
+    } catch (err: any) {
+      console.error('Erro ao autenticar:', err)
+      // Mensagem amigável caso a senha esteja errada ou usuário não exista
       setErro('Usuário ou senha incorretos, ou acesso expirado.')
     } finally {
       setCarregando(false)
