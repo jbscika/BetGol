@@ -1,43 +1,46 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
+// 📁 Importa o auth já configurado do seu próprio projeto
+import { auth } from './lib/firebase' 
+import { onAuthStateChanged } from 'firebase/auth'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 
-// 🔐 Componente de Guarda que protege a rota do ADM
+// 🔐 Guarda de segurança da rota
 function RotaProtegida({ children }) {
   const [estaLogado, setEstaLogado] = useState(null)
-  const auth = getAuth()
 
   useEffect(() => {
-    // Monitora em tempo real se o usuário está logado no Firebase
+    if (!auth) {
+      console.error("Firebase Auth não foi encontrado. Verifique o caminho no import.");
+      setEstaLogado(false);
+      return;
+    }
+
+    // Monitora o login usando o seu auth configurado
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setEstaLogado(true)
-      } else {
-        setEstaLogado(false)
-      }
+      setEstaLogado(!!user) // Vira true se tiver usuário, false se não tiver
     })
 
     return () => unsubscribe()
-  }, [auth])
+  }, [])
 
-  // Enquanto o Firebase descobre se tem alguém logado, mostra uma tela de carregamento
+  // Enquanto o Firebase responde, não deixa a tela preta
   if (estaLogado === null) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFlamily: 'sans-serif' }}>
         <h3>Verificando segurança...</h3>
       </div>
     )
   }
 
-  // Se NÃO estiver logado, chuta o intruso de volta para a tela de /login
+  // Se não estiver logado, manda para o login
   if (!estaLogado) {
     return <Navigate to="/login" replace />
   }
 
-  // Se estiver logado, deixa passar para o painel Admin
+  // Se estiver logado, abre o Admin
   return children
 }
 
@@ -48,7 +51,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/login" element={<Login />} />
         
-        {/* 🔒 Agora a rota Admin está envelopada e protegida pela nossa trava */}
+        {/* Rota Protegida */}
         <Route 
           path="/admin" 
           element={
