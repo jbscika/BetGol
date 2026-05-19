@@ -54,6 +54,11 @@ function parsearResposta(json: any): { linhas: Partida[], colunas: string[], hor
 }
 
 function Dashboard() {
+  // =========================================================================
+  // CHAVE DE PROTEÇÃO - DEVE SER IGUAL À DO SERVER.JS
+  // =========================================================================
+  const CHAVE_PROTECAO = 'Hhelenjbs18@894';
+
   const [ligaSelecionada, setLigaSelecionada] = useState('Copa do Mundo')
   const [linhas, setLinhas] = useState<Partida[]>([])
   const [colunas, setColunas] = useState<string[]>([])
@@ -78,13 +83,16 @@ function Dashboard() {
 
   async function buscarTodasLigas() {
     try {
-      // 🔥 Ajustado para bater direto na sua Hostinger com segurança máxima HTTPS
-      const API = 'https://betgol.tech'
+      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
       const resultados: Record<string, Partida[]> = {}
       await Promise.all(Object.keys(LIGAS).map(async (liga) => {
         if (liga === ligaSelecionada) return
         try {
-          const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(liga)}`)
+          const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(liga)}`, {
+            headers: {
+              'x-api-key': CHAVE_PROTECAO
+            }
+          })
           const json = await resp.json()
           const { linhas: l } = parsearResposta(json)
           if (l.length > 0) resultados[liga] = l
@@ -96,9 +104,12 @@ function Dashboard() {
 
   async function buscarDadosSilencioso() {
     try {
-      // 🔥 Ajustado para bater direto na sua Hostinger com segurança máxima HTTPS
-      const API = 'https://betgol.tech'
-      const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`)
+      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`, {
+        headers: {
+          'x-api-key': CHAVE_PROTECAO
+        }
+      })
       const json = await resp.json()
       const { linhas: l, colunas: c, horas: h } = parsearResposta(json)
       if (l.length === 0) return
@@ -115,9 +126,12 @@ function Dashboard() {
     try {
       setCarregando(true)
       setErro(null)
-      // 🔥 Ajustado para bater direto na sua Hostinger com segurança máxima HTTPS
-      const API = 'https://betgol.tech'
-      const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`)
+      const API = (import.meta as any).env.VITE_API_URL || 'https://betgol-production.up.railway.app'
+      const resp = await fetch(`${API}/resultados?liga=${encodeURIComponent(ligaSelecionada)}`, {
+        headers: {
+          'x-api-key': CHAVE_PROTECAO
+        }
+      })
       const json = await resp.json()
       const { linhas: l, colunas: c, horas: h } = parsearResposta(json)
       if (l.length === 0) throw new Error('Sem dados')
@@ -182,7 +196,7 @@ function Dashboard() {
               dadosTodasLigas={dadosTodasLigas}
             />
             <IATendencia linhas={linhas} colunas={colunas} />
-            <JogosFuturos linhas={linhas} colunas={colunas} horas={horas} />
+            <JogosFuturos lines={linhas} colunas={colunas} horas={horas} />
             <GradeResultados
               linhas={linhas}
               colunas={colunas}
