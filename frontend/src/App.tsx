@@ -1,51 +1,20 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { initializeApp, getApps } from 'firebase/app'
-import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
 
-// 🔑 Cole aqui as suas chaves públicas do Firebase (Web App)
-// Você encontra isso nas configurações do seu projeto no console do Firebase
-const firebaseConfig = {
-  apiKey: "SUA_API_KEY_AQUI",
-  authDomain: "seu-projeto.firebaseapp.com",
-  projectId: "seu-projeto",
-  storageBucket: "seu-projeto.appspot.com",
-  messagingSenderId: "seu-id",
-  appId: "seu-app-id"
-};
+// 🔐 Trava de segurança: Só deixa passar se encontrar o aviso de que o admin logou
+function RotaProtegida({ children }: { children: React.ReactNode }) {
+  // Checa se existe a confirmação de login no navegador
+  const adminLogado = localStorage.getItem('betgol_admin_logado') === 'true'
 
-// Inicializa o Firebase no navegador se ele ainda não tiver sido iniciado
-if (!getApps().length) {
-  initializeApp(firebaseConfig);
-}
-
-// 🔐 Componente que protege a rota do ADM
-function RotaProtegida({ children }) {
-  const [estaLogado, setEstaLogado] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    const auth = getAuth()
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setEstaLogado(!!user)
-    })
-    return () => unsubscribe()
-  }, [])
-
-  if (estaLogado === null) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' }}>
-        <h3>Verificando segurança...</h3>
-      </div>
-    )
-  }
-
-  if (!estaLogado) {
+  if (!adminLogado) {
+    // Se não estiver logado, chuta de volta para o login
     return <Navigate to="/login" replace />
   }
 
+  // Se estiver logado, deixa entrar na tela de Admin
   return children
 }
 
@@ -56,10 +25,10 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/login" element={<Login />} />
         
-        {/* Rota Protegida */}
+        {/* Rota do Admin protegida pela nossa trava */}
         <Route 
           path="/admin" 
-          element={
+          element = {
             <RotaProtegida>
               <Admin />
             </RotaProtegida>
