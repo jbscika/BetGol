@@ -1,20 +1,29 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
 import Admin from './pages/Admin'
+// Se o seu arquivo de cadastro se chamar Cadastro.tsx ou Register.tsx, certifique-se de que ele está criado em pages
+import Cadastro from './pages/Cadastro' 
 
-// 🔐 Trava de segurança: Só deixa passar se encontrar o aviso de que o admin logou
-function RotaProtegida({ children }: { children: React.ReactNode }) {
-  // Checa se existe a confirmação de login no navegador
+// 🔐 Proteção do Painel do ADM
+function RotaAdminProtegida({ children }: { children: React.ReactNode }) {
   const adminLogado = localStorage.getItem('betgol_admin_logado') === 'true'
 
   if (!adminLogado) {
-    // Se não estiver logado, chuta de volta para o login
     return <Navigate to="/login" replace />
   }
 
-  // Se estiver logado, deixa entrar na tela de Admin
+  return children
+}
+
+// 🔓 Proteção da Área do Usuário Comum (Dashboard)
+function RotaUsuarioProtegida({ children }: { children: React.ReactNode }) {
+  const userLogado = localStorage.getItem('betgol_user_logado') === 'true'
+
+  if (!userLogado) {
+    return <Navigate to="/login" replace />
+  }
+
   return children
 }
 
@@ -22,16 +31,27 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/login" element={<Login />} />
+        {/* Área do Usuário Comum protegida */}
+        <Route 
+          path="/" 
+          element={
+            <RotaUsuarioProtegida>
+              <Dashboard />
+            </RotaUsuarioProtegida>
+          } 
+        />
         
-        {/* Rota do Admin protegida pela nossa trava */}
+        {/* Rota Pública de Login e Cadastro */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/cadastro" element={<Cadastro />} />
+        
+        {/* Rota do Admin protegida */}
         <Route 
           path="/admin" 
           element = {
-            <RotaProtegida>
+            <RotaAdminProtegida>
               <Admin />
-            </RotaProtegida>
+            </RotaAdminProtegida>
           } 
         />
       </Routes>
